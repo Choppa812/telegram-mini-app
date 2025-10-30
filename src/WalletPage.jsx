@@ -3,6 +3,8 @@ import WalletConnectModal from './components/WalletConnectModal'
 
 function WalletPage({ onBack, balance }) {
   const [showConnectModal, setShowConnectModal] = useState(false)
+  const [walletConnected, setWalletConnected] = useState(false)
+  const [walletAddress, setWalletAddress] = useState('')
 
   useEffect(() => {
     if (window.Telegram && window.Telegram.WebApp) {
@@ -22,8 +24,9 @@ function WalletPage({ onBack, balance }) {
 
   const handleWalletConnected = (walletInfo) => {
     console.log('Wallet connected:', walletInfo)
+    setWalletConnected(true)
+    setWalletAddress(walletInfo?.address || 'Connected')
     setShowConnectModal(false)
-    // Здесь можно обновить баланс и т.д.
   }
 
   return (
@@ -39,15 +42,29 @@ function WalletPage({ onBack, balance }) {
             <span className="balance-number">{balance} TON</span>
           </div>
           <p className="balance-label">Текущий баланс</p>
+          
+          {walletConnected && (
+            <div className="wallet-connected">
+              <p>Кошелек подключен: {walletAddress}</p>
+            </div>
+          )}
         </div>
 
-        <button 
-          className="connect-wallet-btn" 
-          onClick={() => setShowConnectModal(true)}
-        >
-          <span className="ton-logo">💎</span>
-          <span className="connect-text">Connect Wallet</span>
-        </button>
+        {!walletConnected ? (
+          <button 
+            className="connect-wallet-btn" 
+            onClick={() => setShowConnectModal(true)}
+          >
+            <span className="ton-logo">💎</span>
+            <span className="connect-text">Connect Wallet</span>
+          </button>
+        ) : (
+          <div className="wallet-actions">
+            <button className="disconnect-btn">
+              Отключить кошелек
+            </button>
+          </div>
+        )}
 
         {showConnectModal && (
           <WalletConnectModal 
