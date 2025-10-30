@@ -36,21 +36,13 @@ function WalletConnectModal({ onClose, onWalletConnected }) {
   };
 
   const handleOpenInTelegram = () => {
-    if (window.Telegram && window.Telegram.WebApp) {
-      window.Telegram.WebApp.openInvoice(telegramLink, (status) => {
-        if (status === 'paid') {
-          console.log('Payment successful');
-          onWalletConnected();
-        } else if (status === 'failed') {
-          console.log('Payment failed');
-        } else if (status === 'cancelled') {
-          console.log('Payment cancelled');
-        }
-      });
-    } else {
-      window.open(telegramLink, '_blank', 'noopener,noreferrer');
-    }
-  };
+  if (window.Telegram && window.Telegram.WebApp) {
+    // Альтернативный метод - открываем как ссылку
+    window.Telegram.WebApp.openLink(telegramLink);
+  } else {
+    window.open(telegramLink, '_blank', 'noopener,noreferrer');
+  }
+};
 
   if (isLoading) {
     return (
