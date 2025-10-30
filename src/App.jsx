@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
+import WalletPage from './WalletPage.jsx'
 
 function App() {
   const [autoBuyEnabled, setAutoBuyEnabled] = useState(true)
   const [balance, setBalance] = useState(15.75)
+  const [currentPage, setCurrentPage] = useState('main') // 'main' или 'wallet'
 
   useEffect(() => {
     if (window.Telegram && window.Telegram.WebApp) {
@@ -18,11 +20,19 @@ function App() {
   }
 
   const handleAddBalance = () => {
-    if (window.Telegram && window.Telegram.WebApp) {
-      window.Telegram.WebApp.showAlert('Пополнение баланса')
-    }
+    setCurrentPage('wallet')
   }
 
+  const handleBackToMain = () => {
+    setCurrentPage('main')
+  }
+
+  // Если открыта страница кошелька, показываем ее
+  if (currentPage === 'wallet') {
+    return <WalletPage onBack={handleBackToMain} balance={balance} />
+  }
+
+  // Основная страница
   return (
     <div className="app dark-theme">
       {/* Шапка */}
