@@ -1,6 +1,9 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import WalletConnectModal from './components/WalletConnectModal'
 
 function WalletPage({ onBack, balance }) {
+  const [showConnectModal, setShowConnectModal] = useState(false)
+
   useEffect(() => {
     if (window.Telegram && window.Telegram.WebApp) {
       const tg = window.Telegram.WebApp
@@ -17,10 +20,10 @@ function WalletPage({ onBack, balance }) {
     }
   }, [onBack])
 
-  const handleConnectWallet = () => {
-    if (window.Telegram && window.Telegram.WebApp) {
-      window.Telegram.WebApp.showAlert('Подключение TON кошелька...')
-    }
+  const handleWalletConnected = (walletInfo) => {
+    console.log('Wallet connected:', walletInfo)
+    setShowConnectModal(false)
+    // Здесь можно обновить баланс и т.д.
   }
 
   return (
@@ -38,10 +41,20 @@ function WalletPage({ onBack, balance }) {
           <p className="balance-label">Текущий баланс</p>
         </div>
 
-        <button className="connect-wallet-btn" onClick={handleConnectWallet}>
+        <button 
+          className="connect-wallet-btn" 
+          onClick={() => setShowConnectModal(true)}
+        >
           <span className="ton-logo">💎</span>
           <span className="connect-text">Connect Wallet</span>
         </button>
+
+        {showConnectModal && (
+          <WalletConnectModal 
+            onClose={() => setShowConnectModal(false)}
+            onWalletConnected={handleWalletConnected}
+          />
+        )}
 
         <div className="wallet-info">
           <h3>Информация о кошельке</h3>
