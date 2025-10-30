@@ -1,4 +1,5 @@
 import { TonConnect } from '@tonconnect/sdk';
+import { openTelegramLink, isTelegramEnv } from '@telegram-apps/sdk';
 
 const manifestUrl = 'https://telegram-mini-app-sigma-three.vercel.app/tonconnect-manifest.json';
 
@@ -36,4 +37,49 @@ export const generateTelegramWalletLink = (universalLink) => {
     .replace(/=/g, '');
   
   return `https://t.me/wallet?startattach=${encoded}`;
+};
+
+// НОВАЯ ФУНКЦИЯ: Правильное открытие кошелька внутри Telegram
+export const openWalletConnection = async () => {
+  try {
+    const connection = await initializeConnection();
+    const telegramWalletLink = generateTelegramWalletLink(connection.universalLink);
+    
+    console.log('Wallet link:', telegramWalletLink);
+    
+    // Проверяем, находимся ли мы внутри Telegram
+    if (isTelegramEnv()) {
+      // Используем правильный метод Telegram для открытия ссылки
+      openTelegramLink(telegramWalletLink);
+    } else {
+      // Fallback для браузера (при разработке)
+      console.warn('Not in Telegram environment, opening in new tab');
+      window.open(telegramWalletLink, '_blank');
+    }
+    
+    return connection;
+  } catch (error) {
+    console.error('Error opening wallet connection:', error);
+    throw error;
+  }
+};
+
+// Функция для отключения кошелька
+export const disconnectWallet = async () => {
+  try {
+    await connector.disconnect();
+    console.log('Wallet disconnected');
+  } catch (error) {
+    console.error('Error disconnecting wallet:', error);
+    throw error;
+  }
+};
+
+// Функция для проверки статуса подключения
+export const getConnectionStatus = () => {
+  return {
+    connected: connector.connected,
+    account: connector.account,
+    wallet: connector.wallet
+  };
 };

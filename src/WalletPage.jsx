@@ -1,85 +1,90 @@
-import { useEffect, useState } from 'react'
-import WalletConnectModal from './components/WalletConnectModal'
+import { useState, useEffect } from 'react';
+import { openWalletConnection, connector, getConnectionStatus } from '../ton-connect.js';
 
-function WalletPage({ onBack, balance }) {
-  const [showConnectModal, setShowConnectModal] = useState(false)
-  const [walletConnected, setWalletConnected] = useState(false)
-  const [walletAddress, setWalletAddress] = useState('')
+const WalletPage = ({ onBack, balance }) => {
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState(null);
 
   useEffect(() => {
-    if (window.Telegram && window.Telegram.WebApp) {
-      const tg = window.Telegram.WebApp
-      tg.BackButton.show()
-      tg.BackButton.onClick(() => {
-        onBack()
-      })
-    }
+    // Проверяем статус подключения при загрузке
+    checkConnectionStatus();
+    
+    // Слушаем события изменения статуса подключения
+    const unsubscribe = connector.onStatusChange((wallet) => {
+      setConnectionStatus(getConnectionStatus());
+      console.log('Wallet status changed:', wallet);
+    });
 
-    return () => {
-      if (window.Telegram && window.Telegram.WebApp) {
-        window.Telegram.WebApp.BackButton.offClick()
-      }
-    }
-  }, [onBack])
+    return () => unsubscribe();
+  }, []);
 
-  const handleWalletConnected = (walletInfo) => {
-    console.log('Wallet connected:', walletInfo)
-    setWalletConnected(true)
-    setWalletAddress(walletInfo?.address || 'Connected')
-    setShowConnectModal(false)
-  }
+  const checkConnectionStatus = () => {
+    const status = getConnectionStatus();
+    setConnectionStatus(status);
+  };
+
+  const handleConnectWallet = async () => {
+    try {
+      setIsConnecting(true);
+      await openWalletConnection();
+    } catch (error) {
+      console.error('Failed to connect wallet:', error);
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    try {
+      await disconnectWallet();
+      setConnectionStatus(getConnectionStatus());
+    } catch (error) {
+      console.error('Failed to disconnect wallet:', error);
+    }
+  };
 
   return (
     <div className="wallet-page">
       <header className="wallet-header">
-        <h1>Баланс</h1>
+        <button className="back-button" onClick={onBack}>
+          ← Назад
+        </button>
+        <h2>Кошелек</h2>
       </header>
 
-      <main className="wallet-main">
-        <div className="balance-card">
-          <div className="balance-amount-large">
-            <span className="ton-icon-large">💎</span>
-            <span className="balance-number">{balance} TON</span>
-          </div>
-          <p className="balance-label">Текущий баланс</p>
+      <div className="wallet-content">
+        <div className="balance-section">
+          <h3>Ваш баланс</h3>
+          <div className="balance-amount">{balance} TON</div>
+        </div>
+
+        <div className="connection-section">
+          <h3>Подключение кошелька</h3>
           
-          {walletConnected && (
-            <div className="wallet-connected">
-              <p>Кошелек подключен: {walletAddress}</p>
+          {connectionStatus?.connected ? (
+            <div className="connected-wallet">
+              <p>✅ Кошелек подключен</p>
+              <p>Адрес: {connectionStatus.account?.address.slice(0, 8)}...{connectionStatus.account?.address.slice(-8)}</p>
+              <button onClick={handleDisconnect} className="disconnect-btn">
+                Отключить
+              </button>
+            </div>
+          ) : (
+            <div className="connect-wallet">
+              <p>Подключите кошелек для управления средствами</p>
+              <button 
+                onClick={handleConnectWallet} 
+                disabled={isConnecting}
+                className="connect-btn"
+              >
+                {isConnecting ? 'Подключение...' : 'Подключить кошелек'}
+              </button>
             </div>
           )}
         </div>
-
-        {!walletConnected ? (
-          <button 
-            className="connect-wallet-btn" 
-            onClick={() => setShowConnectModal(true)}
-          >
-            <span className="ton-logo">💎</span>
-            <span className="connect-text">Connect Wallet</span>
-          </button>
-        ) : (
-          <div className="wallet-actions">
-            <button className="disconnect-btn">
-              Отключить кошелек
-            </button>
-          </div>
-        )}
-
-        {showConnectModal && (
-          <WalletConnectModal 
-            onClose={() => setShowConnectModal(false)}
-            onWalletConnected={handleWalletConnected}
-          />
-        )}
-
-        <div className="wallet-info">
-          <h3>Информация о кошельке</h3>
-          <p>Подключите TON кошелек для пополнения баланса и управления средствами</p>
-        </div>
-      </main>
+      </div>
     </div>
-  )
-}
+  );
+};
 
-export default WalletPage
+export default WalletPage;
