@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { connector, generateConnectUrl } from '../ton-connect';
+import { connector, generateConnectUrl, generateTelegramWalletLink } from '../ton-connect';
 
 function WalletConnectModal({ onClose, onWalletConnected }) {
   const [currentStep, setCurrentStep] = useState('wallet-selection');
   const [universalLink, setUniversalLink] = useState('');
   const [telegramLink, setTelegramLink] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     initializeConnection();
@@ -13,20 +14,19 @@ function WalletConnectModal({ onClose, onWalletConnected }) {
 
   const initializeConnection = async () => {
     try {
-      const universalUrl = await generateConnectUrl(connector);
+      setIsLoading(true);
+      const universalUrl = await generateConnectUrl();
       setUniversalLink(universalUrl);
       
-      // Генерация ссылки для Telegram Wallet
-      const encodedUrl = btoa(universalUrl)
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=/g, '');
-    const tgWalletLink = `https://t.me/wallet?startattach=${encodedUrl}`;
-    setTelegramLink(tgWalletLink);
-  } catch (error) {
-    console.error('Error generating connection URL:', error);
-  }
-};
+      // Генерация правильной ссылки для Telegram Wallet
+      const tgLink = generateTelegramWalletLink(universalUrl);
+      setTelegramLink(tgLink);
+    } catch (error) {
+      console.error('Error generating connection URL:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleTelegramWalletClick = () => {
     setCurrentStep('telegram-wallet');
@@ -37,8 +37,26 @@ function WalletConnectModal({ onClose, onWalletConnected }) {
   };
 
   const handleOpenInTelegram = () => {
-    window.open(telegramLink, '_blank');
+    // Открываем ссылку в новом окне/вкладке
+    window.open(telegramLink, '_blank', 'noopener,noreferrer');
   };
+
+  // Показываем загрузку
+  if (isLoading) {
+    return (
+      <div className="modal-overlay">
+        <div className="wallet-connect-modal">
+          <div className="modal-header">
+            <h3>Connect Wallet</h3>
+            <button className="close-btn" onClick={onClose}>×</button>
+          </div>
+          <div className="loading-section">
+            <p>Generating connection...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (currentStep === 'wallet-selection') {
     return (
@@ -62,7 +80,13 @@ function WalletConnectModal({ onClose, onWalletConnected }) {
             {universalLink && (
               <div className="qr-section">
                 <p>Scan QR code with any TON wallet</p>
-                <QRCodeSVG value={universalLink} size={200} />
+                <QRCodeSVG 
+                  value={universalLink} 
+                  size={200}
+                  level="M"
+                  includeMargin={true}
+                />
+                <p className="qr-note">Or copy this link: {universalLink.substring(0, 30)}...</p>
               </div>
             )}
           </div>
@@ -84,18 +108,29 @@ function WalletConnectModal({ onClose, onWalletConnected }) {
           <div className="telegram-wallet-content">
             {telegramLink && (
               <div className="qr-section">
-                <QRCodeSVG value={telegramLink} size={200} />
-                <p>Scan QR code to open in Telegram</p>
+                <QRCodeSVG 
+                  value={telegramLink} 
+                  size={200}
+                  level="M"
+                  includeMargin={true}
+                />
+                <p>Scan QR code to open Telegram Wallet</p>
               </div>
             )}
             
             <button className="tg-wallet-btn" onClick={handleOpenInTelegram}>
-              Connect Wallet in Telegram on desktop
+              💎 Open Telegram Wallet
             </button>
             
-            <p className="wallet-note">
-              This will open Telegram Wallet where you can approve the connection
-            </p>
+            <div className="wallet-steps">
+              <h4>How to connect:</h4>
+              <ol>
+                <li>Click the button above</li>
+                <li>Telegram Wallet will open</li>
+                <li>Approve the connection request</li>
+                <li>Return to this app</li>
+              </ol>
+            </div>
           </div>
         </div>
       </div>
