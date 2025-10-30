@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { connector, generateConnectUrl, generateTelegramWalletLink } from '../ton-connect';
+import { connector, initializeConnection, generateTelegramWalletLink } from '../ton-connect';
 
 function WalletConnectModal({ onClose, onWalletConnected }) {
   const [currentStep, setCurrentStep] = useState('wallet-selection');
@@ -9,17 +9,30 @@ function WalletConnectModal({ onClose, onWalletConnected }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    initializeConnection();
+    initializeAppConnection();
   }, []);
 
-  const initializeConnection = async () => {
+  const initializeAppConnection = async () => {
     try {
       setIsLoading(true);
-      const universalUrl = await generateConnectUrl();
-      setUniversalLink(universalUrl);
       
-      const tgLink = generateTelegramWalletLink(universalUrl);
+      // Используем новую функцию инициализации
+      const connection = await initializeConnection();
+      setUniversalLink(connection.universalLink);
+      
+      // Генерируем ссылку для Telegram Wallet
+      const tgLink = generateTelegramWalletLink(connection.universalLink);
       setTelegramLink(tgLink);
+      
+      // Слушаем события подключения кошелька
+      const unsubscribe = connector.onStatusChange((wallet) => {
+        if (wallet) {
+          console.log('Wallet connected:', wallet);
+          onWalletConnected(wallet);
+          unsubscribe();
+        }
+      });
+      
     } catch (error) {
       console.error('Error generating connection URL:', error);
     } finally {
@@ -36,13 +49,14 @@ function WalletConnectModal({ onClose, onWalletConnected }) {
   };
 
   const handleOpenInTelegram = () => {
-  if (window.Telegram && window.Telegram.WebApp) {
-    // Альтернативный метод - открываем как ссылку
-    window.Telegram.WebApp.openLink(telegramLink);
-  } else {
-    window.open(telegramLink, '_blank', 'noopener,noreferrer');
-  }
-};
+    if (window.Telegram && window.Telegram.WebApp) {
+      // Используем openTelegramLink для открытия кошелька
+      window.Telegram.WebApp.openTelegramLink(telegramLink);
+    } else {
+      // Fallback для браузера
+      window.open(telegramLink, '_blank', 'noopener,noreferrer');
+    }
+  };
 
   if (isLoading) {
     return (
@@ -132,6 +146,13 @@ function WalletConnectModal({ onClose, onWalletConnected }) {
                 <li>Approve the connection request</li>
                 <li>Return to this app</li>
               </ol>
+            </div>
+
+            <div className="debug-info">
+              <p><strong>Debug info:</strong></p>
+              <p>In Telegram: Will open Wallet Mini App</p>
+              <p>In browser: Will open @wallet bot</p>
+              <p>Link: {telegramLink.substring(0, 50)}...</p>
             </div>
           </div>
         </div>
