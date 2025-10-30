@@ -1,5 +1,4 @@
 import { TonConnect } from '@tonconnect/sdk';
-import { openTelegramLink } from '@telegram-apps/sdk';
 
 const manifestUrl = 'https://telegram-mini-app-sigma-three.vercel.app/tonconnect-manifest.json';
 
@@ -8,12 +7,10 @@ export const connector = new TonConnect({ manifestUrl });
 // Функция для инициализации подключения
 export const initializeConnection = async () => {
   try {
-    // Проверяем есть ли уже подключенный кошелек
     if (connector.connected) {
       return connector;
     }
 
-    // Создаем ссылку для подключения
     const universalLink = connector.connect({
       bridgeUrl: 'https://bridge.tonapi.io/bridge',
       universalLink: 'https://tc.tonkeeper.com'
@@ -39,7 +36,7 @@ export const generateTelegramWalletLink = (universalLink) => {
   return `https://t.me/wallet?startattach=${encoded}`;
 };
 
-// НОВАЯ ФУНКЦИЯ: Правильное открытие кошелька внутри Telegram
+// Функция для открытия кошелька
 export const openWalletConnection = async () => {
   try {
     const connection = await initializeConnection();
@@ -50,12 +47,11 @@ export const openWalletConnection = async () => {
     // Проверяем, находимся ли мы внутри Telegram WebView
     const isTelegramWebView = window.Telegram && window.Telegram.WebApp;
     
-    if (isTelegramWebView) {
-      // Используем правильный метод Telegram для открытия ссылки
-      openTelegramLink(telegramWalletLink);
+    if (isTelegramWebView && window.Telegram.WebApp.openLink) {
+      // Используем метод Telegram для открытия ссылки
+      window.Telegram.WebApp.openLink(telegramWalletLink);
     } else {
-      // Fallback для браузера (при разработке)
-      console.warn('Not in Telegram environment, opening in new tab');
+      // Fallback для браузера
       window.open(telegramWalletLink, '_blank');
     }
     

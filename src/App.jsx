@@ -1,25 +1,20 @@
 import { useEffect, useState } from 'react'
 import WalletPage from './WalletPage.jsx'
-// Убираем useUtils, так как он не экспортируется
-// import { useUtils } from '@telegram-apps/sdk-react'
 
 function App() {
   const [autoBuyEnabled, setAutoBuyEnabled] = useState(true)
   const [balance, setBalance] = useState(15.75)
-  const [currentPage, setCurrentPage] = useState('main') // 'main' или 'wallet'
+  const [currentPage, setCurrentPage] = useState('main')
 
   useEffect(() => {
-    // Правильная инициализация Telegram WebApp
     if (window.Telegram && window.Telegram.WebApp) {
       const tg = window.Telegram.WebApp
       tg.expand()
       tg.setHeaderColor('#1a1a1a')
       tg.setBackgroundColor('#0a0a0a')
-      tg.enableClosingConfirmation() // Подтверждение закрытия
+      tg.enableClosingConfirmation()
       
       console.log('Telegram WebApp initialized:', tg.initData)
-      console.log('Platform:', tg.platform)
-      console.log('Launch params:', tg.initDataUnsafe)
     }
   }, [])
 
