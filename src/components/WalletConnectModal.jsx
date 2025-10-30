@@ -17,12 +17,16 @@ function WalletConnectModal({ onClose, onWalletConnected }) {
       setUniversalLink(universalUrl);
       
       // Генерация ссылки для Telegram Wallet
-      const tgWalletLink = `https://t.me/wallet/start?startapp=${btoa(universalUrl)}`;
-      setTelegramLink(tgWalletLink);
-    } catch (error) {
-      console.error('Error generating connection URL:', error);
-    }
-  };
+      const encodedUrl = btoa(universalUrl)
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=/g, '');
+    const tgWalletLink = `https://t.me/wallet?startattach=${encodedUrl}`;
+    setTelegramLink(tgWalletLink);
+  } catch (error) {
+    console.error('Error generating connection URL:', error);
+  }
+};
 
   const handleTelegramWalletClick = () => {
     setCurrentStep('telegram-wallet');
