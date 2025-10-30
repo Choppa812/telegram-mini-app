@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react'
 function App() {
   const [autoBuyEnabled, setAutoBuyEnabled] = useState(true)
   const [activeTab, setActiveTab] = useState('all')
+  const [showColorPicker, setShowColorPicker] = useState(false)
+  const [selectedColor, setSelectedColor] = useState('Azure Blue')
   const [subscriptions, setSubscriptions] = useState([
     {
       id: 1,
@@ -54,6 +56,15 @@ function App() {
     }
   ])
 
+  const colors = [
+    { name: "Amber", gradient: "radial-gradient(circle, rgb(218, 179, 69) 1%, rgb(177, 128, 42) 80%)" },
+    { name: "Aquamarine", gradient: "radial-gradient(circle, rgb(96, 177, 149) 1%, rgb(70, 171, 180) 80%)" },
+    { name: "Azure Blue", gradient: "radial-gradient(circle, rgb(93, 177, 203) 1%, rgb(68, 139, 171) 80%)" },
+    { name: "Battleship Grey", gradient: "radial-gradient(circle, rgb(140, 140, 133) 1%, rgb(108, 108, 102) 80%)" },
+    { name: "Black", gradient: "radial-gradient(circle, rgb(54, 55, 56) 1%, rgb(14, 15, 15) 80%)" },
+    { name: "Burgundy", gradient: "radial-gradient(circle, rgb(163, 94, 102) 1%, rgb(109, 65, 74) 80%)" }
+  ]
+
   useEffect(() => {
     if (window.Telegram && window.Telegram.WebApp) {
       const tg = window.Telegram.WebApp
@@ -72,17 +83,20 @@ function App() {
   }
 
   const addSlot = () => {
-    // Логика добавления слота
     if (window.Telegram && window.Telegram.WebApp) {
       window.Telegram.WebApp.showAlert('Добавление слота за 0.4 ₽')
     }
   }
 
   const addSubscription = () => {
-    // Логика добавления подписки
     if (window.Telegram && window.Telegram.WebApp) {
       window.Telegram.WebApp.showAlert('Добавление подписки')
     }
+  }
+
+  const handleColorSelect = (colorName) => {
+    setSelectedColor(colorName)
+    setShowColorPicker(false)
   }
 
   return (
@@ -102,7 +116,7 @@ function App() {
         <div className="nav-tabs">
           <button 
             className={`tab ${activeTab === 'background' ? 'active' : ''}`}
-            onClick={() => setActiveTab('background')}
+            onClick={() => setShowColorPicker(true)}
           >
             Фон
           </button>
@@ -120,6 +134,41 @@ function App() {
           </button>
         </div>
       </nav>
+
+      {/* Модальное окно выбора цвета */}
+      {showColorPicker && (
+        <div className="modal-overlay" onClick={() => setShowColorPicker(false)}>
+          <div className="color-picker-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Выберите цвет</h3>
+              <button 
+                className="close-btn"
+                onClick={() => setShowColorPicker(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="colors-list">
+              {colors.map((color) => (
+                <div
+                  key={color.name}
+                  className={`color-item ${selectedColor === color.name ? 'selected' : ''}`}
+                  onClick={() => handleColorSelect(color.name)}
+                >
+                  <div 
+                    className="color-preview"
+                    style={{ background: color.gradient }}
+                  ></div>
+                  <span className="color-name">{color.name}</span>
+                  {selectedColor === color.name && (
+                    <div className="checkmark">✓</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Статистика слотов */}
       <div className="slots-info">
