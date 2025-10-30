@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import QRCode from 'qrcode.react';
+import { QRCodeSVG } from 'qrcode.react';
 import { connector, generateConnectUrl } from '../ton-connect';
 
 function WalletConnectModal({ onClose, onWalletConnected }) {
@@ -58,7 +58,7 @@ function WalletConnectModal({ onClose, onWalletConnected }) {
             {universalLink && (
               <div className="qr-section">
                 <p>Scan QR code with any TON wallet</p>
-                <QRCode value={universalLink} size={200} />
+                <QRCodeSVG value={universalLink} size={200} />
               </div>
             )}
           </div>
@@ -80,7 +80,7 @@ function WalletConnectModal({ onClose, onWalletConnected }) {
           <div className="telegram-wallet-content">
             {telegramLink && (
               <div className="qr-section">
-                <QRCode value={telegramLink} size={200} />
+                <QRCodeSVG value={telegramLink} size={200} />
                 <p>Scan QR code to open in Telegram</p>
               </div>
             )}
