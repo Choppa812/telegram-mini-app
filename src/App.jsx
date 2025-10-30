@@ -1,72 +1,127 @@
 import { useEffect, useState } from 'react'
 
 function App() {
-  const [user, setUser] = useState(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [autoBuyEnabled, setAutoBuyEnabled] = useState(false)
+  const [balance, setBalance] = useState(15.75)
 
   useEffect(() => {
-    // Проверяем есть ли Telegram WebApp
+    // Инициализация Telegram WebApp
     if (window.Telegram && window.Telegram.WebApp) {
       const tg = window.Telegram.WebApp
-      
-      // Расширяем на весь экран
       tg.expand()
+      tg.enableClosingConfirmation()
       
-      // Показываем кнопку "Назад"
-      tg.BackButton.show()
-      tg.BackButton.onClick(() => {
-        window.history.back()
-      })
-      
-      // Получаем данные пользователя
-      const userData = tg.initDataUnsafe.user
-      if (userData) {
-        setUser({
-          firstName: userData.first_name,
-          lastName: userData.last_name,
-          username: userData.username
-        })
-      }
+      // Устанавливаем темную тему
+      tg.setHeaderColor('#1a1a1a')
+      tg.setBackgroundColor('#0a0a0a')
     }
-    
-    setIsLoading(false)
   }, [])
 
-  if (isLoading) {
-    return <div className="loading">Загрузка...</div>
+  const handleAutoBuyToggle = () => {
+    setAutoBuyEnabled(!autoBuyEnabled)
+    // Здесь будет логика включения/выключения авто-покупки
+    if (window.Telegram && window.Telegram.WebApp) {
+      window.Telegram.WebApp.showAlert(
+        `Автопокупка ${!autoBuyEnabled ? 'включена' : 'выключена'}`
+      )
+    }
+  }
+
+  const handleAddBalance = () => {
+    // Логика пополнения баланса
+    if (window.Telegram && window.Telegram.WebApp) {
+      window.Telegram.WebApp.showAlert('Пополнение баланса')
+    }
   }
 
   return (
-    <div className="app">
+    <div className="app dark-theme">
+      {/* Шапка */}
       <header className="app-header">
-        <h1>Мое Mini App</h1>
-        {user ? (
-          <div className="user-info">
-            <p>Привет, {user.firstName}!</p>
+        <div className="header-content">
+          <div className="auto-buy-section">
+            <span className="auto-buy-label">Автопокупка</span>
+            <div 
+              className={`toggle ${autoBuyEnabled ? 'active' : ''}`}
+              onClick={handleAutoBuyToggle}
+            >
+              <div className="toggle-handle"></div>
+            </div>
           </div>
-        ) : (
-          <div className="user-info">
-            <p>Тестовый режим</p>
+          
+          <div className="balance-section">
+            <div className="balance">
+              <span className="ton-icon">💎</span>
+              <span className="balance-amount">{balance}</span>
+            </div>
+            <div className="add-balance" onClick={handleAddBalance}>
+              <div className="plus-icon">+</div>
+            </div>
           </div>
-        )}
+        </div>
       </header>
-      
+
+      {/* Основной контент */}
       <main className="app-main">
-        <div className="card">
-          <h2>Добро пожаловать!</h2>
-          <p>Это ваше мини-приложение в Telegram</p>
+        <div className="content-card">
+          <h2>Автопокупка подарков</h2>
+          <p className="status">
+            Статус: <span className={autoBuyEnabled ? 'enabled' : 'disabled'}>
+              {autoBuyEnabled ? 'Активна' : 'Неактивна'}
+            </span>
+          </p>
+          
+          <div className="features">
+            <div className="feature-item">
+              <div className="feature-icon">🎁</div>
+              <div className="feature-text">
+                <h3>Автоматическая покупка</h3>
+                <p>Система автоматически покупает подарки при появлении новых</p>
+              </div>
+            </div>
+            
+            <div className="feature-item">
+              <div className="feature-icon">⚡</div>
+              <div className="feature-text">
+                <h3>Мгновенная реакция</h3>
+                <p>Покупка происходит в течение секунд после появления подарка</p>
+              </div>
+            </div>
+            
+            <div className="feature-item">
+              <div className="feature-icon">🛡️</div>
+              <div className="feature-text">
+                <h3>Безопасность</h3>
+                <p>Все транзакции защищены и прозрачны</p>
+              </div>
+            </div>
+          </div>
+
           <button 
-            className="primary-button"
-            onClick={() => {
-              if (window.Telegram && window.Telegram.WebApp) {
-                window.Telegram.WebApp.showAlert('Привет из Mini App!')
-              } else {
-                alert('Привет из Mini App! (тестовый режим)')
-              }
-            }}
+            className={`action-button ${autoBuyEnabled ? 'stop' : 'start'}`}
+            onClick={handleAutoBuyToggle}
           >
-            Нажми меня
+            {autoBuyEnabled ? 'Остановить автопокупку' : 'Запустить автопокупку'}
           </button>
+        </div>
+
+        {/* Статистика */}
+        <div className="stats-card">
+          <h3>Статистика</h3>
+          <div className="stats-grid">
+            <div className="stat">
+              <div className="stat-value">12</div>
+              <div className="stat-label">Куплено подарков</div>
+            </div>
+            <div className="stat">
+              <div className="stat-value">8.5</div>
+              <div className="stat-label">Потрачено TON</div>
+            </div>
+            <div className="stat">
+              <div className="stat-value">94%</div>
+              <div className="stat-label">Успешных покупок</div>
+            </div>
+          </div>
         </div>
       </main>
     </div>
