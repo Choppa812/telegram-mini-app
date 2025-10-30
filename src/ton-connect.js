@@ -1,5 +1,5 @@
 import { TonConnect } from '@tonconnect/sdk';
-import { openTelegramLink, isTelegramEnv } from '@telegram-apps/sdk';
+import { openTelegramLink } from '@telegram-apps/sdk';
 
 const manifestUrl = 'https://telegram-mini-app-sigma-three.vercel.app/tonconnect-manifest.json';
 
@@ -47,8 +47,10 @@ export const openWalletConnection = async () => {
     
     console.log('Wallet link:', telegramWalletLink);
     
-    // Проверяем, находимся ли мы внутри Telegram
-    if (isTelegramEnv()) {
+    // Проверяем, находимся ли мы внутри Telegram WebView
+    const isTelegramWebView = window.Telegram && window.Telegram.WebApp;
+    
+    if (isTelegramWebView) {
       // Используем правильный метод Telegram для открытия ссылки
       openTelegramLink(telegramWalletLink);
     } else {
