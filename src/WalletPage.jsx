@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { openWalletConnection, connector, getConnectionStatus } from '../ton-connect.js';
+import { openWalletConnection, connector, getConnectionStatus } from './ton-connect.js';
 
 const WalletPage = ({ onBack, balance }) => {
   const [isConnecting, setIsConnecting] = useState(false);
