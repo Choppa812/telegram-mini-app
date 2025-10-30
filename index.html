@@ -1,112 +1,401 @@
-/* Страница кошелька */
-.wallet-page {
-    min-height: 100vh;
-    background: #0a0a0a;
-    color: #fff;
-}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <title>Auto Gift Buyer</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0a0a;
+            color: #ffffff;
+            min-height: 100vh;
+        }
+        
+        .dark-theme {
+            background: #0a0a0a;
+            color: #ffffff;
+            min-height: 100vh;
+        }
+        
+        /* Шапка */
+        .app-header {
+            background: #1a1a1a;
+            padding: 16px 20px;
+            border-bottom: 1px solid #2a2a2a;
+        }
+        
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .auto-buy-toggle {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .toggle-label {
+            font-size: 16px;
+            font-weight: 600;
+            color: #fff;
+        }
+        
+        .toggle {
+            width: 44px;
+            height: 24px;
+            background: #666;
+            border-radius: 12px;
+            padding: 2px;
+            cursor: pointer;
+            transition: background 0.3s;
+            position: relative;
+        }
+        
+        .toggle.active {
+            background: #0088cc;
+        }
+        
+        .toggle-slider {
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.3s;
+            transform: translateX(0);
+        }
+        
+        .toggle.active .toggle-slider {
+            transform: translateX(20px);
+        }
+        
+        .balance-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .balance-display {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: #2a2a2a;
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid #333;
+        }
+        
+        .ton-symbol {
+            font-size: 16px;
+        }
+        
+        .balance-amount {
+            font-size: 14px;
+            font-weight: 600;
+        }
+        
+        .add-balance-btn {
+            width: 32px;
+            height: 32px;
+            background: #0088cc;
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .add-balance-btn:active {
+            background: #0066aa;
+        }
+        
+        /* Основной контент */
+        .main-content {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        
+        .status-card {
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 12px;
+            padding: 20px;
+        }
+        
+        .status-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .status-header h2 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #fff;
+        }
+        
+        .status-badge {
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .status-badge.active {
+            background: #1a3a2a;
+            color: #00d26a;
+            border: 1px solid #00d26a;
+        }
+        
+        .status-badge.inactive {
+            background: #3a2a2a;
+            color: #ff6b6b;
+            border: 1px solid #ff6b6b;
+        }
+        
+        .features-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .feature-card {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 16px;
+            background: #2a2a2a;
+            border-radius: 8px;
+            border: 1px solid #333;
+        }
+        
+        .feature-icon {
+            font-size: 20px;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #1a1a1a;
+            border-radius: 6px;
+            flex-shrink: 0;
+        }
+        
+        .feature-content h3 {
+            font-size: 14px;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 4px;
+        }
+        
+        .feature-content p {
+            font-size: 12px;
+            color: #ccc;
+            line-height: 1.4;
+        }
+        
+        .action-btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .action-btn.start {
+            background: #0088cc;
+            color: white;
+        }
+        
+        .action-btn.start:active {
+            background: #0066aa;
+        }
+        
+        .action-btn.stop {
+            background: #ff3b30;
+            color: white;
+        }
+        
+        .action-btn.stop:active {
+            background: #dd2c20;
+        }
+        
+        /* Статистика */
+        .stats-card {
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 12px;
+            padding: 20px;
+        }
+        
+        .stats-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 16px;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 12px;
+        }
+        
+        .stat-item {
+            text-align: center;
+            background: #2a2a2a;
+            padding: 16px 12px;
+            border-radius: 8px;
+            border: 1px solid #333;
+        }
+        
+        .stat-number {
+            font-size: 20px;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 4px;
+        }
+        
+        .stat-label {
+            font-size: 11px;
+            color: #999;
+        }
 
-.wallet-header {
-    background: #1a1a1a;
-    padding: 16px 20px;
-    border-bottom: 1px solid #2a2a2a;
-    text-align: center;
-}
+        /* Страница кошелька */
+        .wallet-page {
+            min-height: 100vh;
+            background: #0a0a0a;
+            color: #fff;
+        }
 
-.wallet-header h1 {
-    font-size: 18px;
-    font-weight: 600;
-}
+        .wallet-header {
+            background: #1a1a1a;
+            padding: 16px 20px;
+            border-bottom: 1px solid #2a2a2a;
+            text-align: center;
+        }
 
-.wallet-main {
-    padding: 40px 20px 20px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 24px;
-}
+        .wallet-header h1 {
+            font-size: 18px;
+            font-weight: 600;
+        }
 
-.balance-card {
-    background: #1a1a1a;
-    border: 1px solid #2a2a2a;
-    border-radius: 16px;
-    padding: 32px 24px;
-    text-align: center;
-    width: 100%;
-    max-width: 300px;
-}
+        .wallet-main {
+            padding: 40px 20px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 24px;
+        }
 
-.balance-amount-large {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    margin-bottom: 8px;
-}
+        .balance-card {
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 16px;
+            padding: 32px 24px;
+            text-align: center;
+            width: 100%;
+            max-width: 300px;
+        }
 
-.ton-icon-large {
-    font-size: 32px;
-}
+        .balance-amount-large {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
 
-.balance-number {
-    font-size: 32px;
-    font-weight: 700;
-    color: #fff;
-}
+        .ton-icon-large {
+            font-size: 32px;
+        }
 
-.balance-label {
-    font-size: 14px;
-    color: #999;
-}
+        .balance-number {
+            font-size: 32px;
+            font-weight: 700;
+            color: #fff;
+        }
 
-.connect-wallet-btn {
-    background: #0088cc;
-    border: none;
-    border-radius: 12px;
-    padding: 16px 24px;
-    color: white;
-    font-size: 16px;
-    font-weight: 600;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    width: 100%;
-    max-width: 300px;
-    justify-content: center;
-    transition: background 0.3s;
-}
+        .balance-label {
+            font-size: 14px;
+            color: #999;
+        }
 
-.connect-wallet-btn:active {
-    background: #0066aa;
-}
+        .connect-wallet-btn {
+            background: #0088cc;
+            border: none;
+            border-radius: 12px;
+            padding: 16px 24px;
+            color: white;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
+            max-width: 300px;
+            justify-content: center;
+            transition: background 0.3s;
+        }
 
-.ton-logo {
-    font-size: 20px;
-}
+        .connect-wallet-btn:active {
+            background: #0066aa;
+        }
 
-.connect-text {
-    font-size: 16px;
-}
+        .ton-logo {
+            font-size: 20px;
+        }
 
-.wallet-info {
-    background: #1a1a1a;
-    border: 1px solid #2a2a2a;
-    border-radius: 12px;
-    padding: 20px;
-    width: 100%;
-    max-width: 300px;
-    text-align: center;
-}
+        .connect-text {
+            font-size: 16px;
+        }
 
-.wallet-info h3 {
-    font-size: 16px;
-    font-weight: 600;
-    margin-bottom: 8px;
-    color: #fff;
-}
+        .wallet-info {
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 12px;
+            padding: 20px;
+            width: 100%;
+            max-width: 300px;
+            text-align: center;
+        }
 
-.wallet-info p {
-    font-size: 14px;
-    color: #999;
-    line-height: 1.4;
-}
+        .wallet-info h3 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #fff;
+        }
+
+        .wallet-info p {
+            font-size: 14px;
+            color: #999;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+</body>
+</html>
