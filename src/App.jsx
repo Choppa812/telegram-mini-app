@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react'
 import WalletPage from './WalletPage.jsx'
-import { useUtils } from '@telegram-apps/sdk-react'
+// Убираем useUtils, так как он не экспортируется
+// import { useUtils } from '@telegram-apps/sdk-react'
 
 function App() {
   const [autoBuyEnabled, setAutoBuyEnabled] = useState(true)
   const [balance, setBalance] = useState(15.75)
   const [currentPage, setCurrentPage] = useState('main') // 'main' или 'wallet'
-  
-  const utils = useUtils()
 
   useEffect(() => {
     // Правильная инициализация Telegram WebApp
