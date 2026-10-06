@@ -1,4 +1,4 @@
-import { sameSecret } from '../runtime.js';
+import { runtime, sameSecret } from '../runtime.js';
 import { probeSatellite } from '../satellite.js';
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
@@ -12,6 +12,8 @@ export default async function handler(req, res) {
   if (!sameSecret(body?.secret, process.env.CRON_SECRET)) return res.status(401).json({ok:false});
   try {
     const result = await probeSatellite(process.env.GIFT_SATELLITE_API_KEY);
+    const {send} = runtime();
+    await send(result.ok ? `Проверка API Gift Satellite: чтение слотов работает.\nСлотов: ${result.slots}. Неактивных: ${result.inactiveSlots}.\nМинимумы: ${result.floors.map(f=>`${f.market}/${f.backdrop}: HTTP ${f.status}, ${f.collections} коллекций`).join('; ')}.\nЦены не менялись.` : `Проверка API Gift Satellite не прошла.\nПричина: ${result.reason}.\n${(result.attempts||[]).map(a=>`${a.mode}: HTTP ${a.status}`).join('; ')}\nЦены не менялись.`);
     return res.status(200).json(result);
   } catch {
     return res.status(503).json({ok:false,reason:'provider_request_failed'});
