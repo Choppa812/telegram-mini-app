@@ -23,3 +23,10 @@ test('probe does not retry provider failures and blocks unsupported paths', asyn
   assert.equal(result.ok,false); assert.equal(calls,1);
   await assert.rejects(readSatellite('/user/buy',{},'secret','authorization'),/UNSUPPORTED_READ_PATH/);
 });
+test('server authToken header is supported and error diagnostics redact the key', async()=>{
+  const result=await readSatellite('/user/subscriptions',{},'sensitive-key','auth-token',async(url,options)=>{
+    assert.equal(options.headers.authToken,'sensitive-key');
+    return {ok:false,status:401,json:async()=>({message:'Invalid sensitive-key'})};
+  });
+  assert.equal(result.message,'Invalid [REDACTED]');
+});

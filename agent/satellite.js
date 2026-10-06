@@ -38,3 +38,9 @@ export async function probeSatellite(key, fetcher = fetch) {
   }
   return { ok: true, mode: selected.mode, attempts, slots: selected.subscriptions.length, inactiveSlots: selected.subscriptions.filter(s=>s.portalsAutobuy === false).length, slotFields: Object.keys(selected.subscriptions[0] || {}), slotSample: selected.subscriptions.slice(0,3).map(s=>({ id:s._id, collection:s.collectionName, backgrounds:s.backdropNames, models:s.modelNames, autobuy:s.portalsAutobuy, limit:s.portalsAutobuyMaxPrice })), floors, writesPerformed: 0 };
 }
+
+// Verification is read-only until the permanent-key contract is documented.
+export async function checkDailySatellite(key, fetcher = fetch) {
+  const result = await probeSatellite(key, fetcher);
+  return { status: 'blocked', reason: result.ok ? 'write_contract_unverified' : 'api_authorization_failed', checked: result.ok ? result.slots : 0, changed: 0, skipped: result.ok ? result.slots : 0 };
+}

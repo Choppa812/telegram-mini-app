@@ -52,6 +52,12 @@ test('unconnected API is reported truthfully without inventing successful change
   assert.equal(r.changed, undefined);
   assert.match(s.messages[0], /не изменялись/);
 });
+test('API authorization rejection is a blocked report rather than a completed price update', async () => {
+  const s = setup(); s.state.paused = false;
+  const r = await dailyReport({...s,run:async()=>({status:'blocked',reason:'api_authorization_failed',checked:0,changed:0,skipped:0})});
+  assert.equal(r.status,'blocked'); assert.equal(r.changed,0);
+  assert.match(s.messages[0],/отклонил постоянный API-ключ/);
+});
 test('pause during a run stops the next write', async () => {
   const s = setup(); s.state.paused = false; let writes = 0;
   await dailyReport({ ...s, run: async ({ beforeWrite }) => {

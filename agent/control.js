@@ -2,13 +2,16 @@ export const STOP_NOTICE = 'Автонастройка остановлена. �
 
 export function reportText(report) {
   if (!report) return 'Отчётов пока нет.';
-  const states = { paused: 'Автонастройка на паузе', disconnected: 'API Gift Satellite ещё не подключён', completed: 'Проверка завершена', error: 'Проверка не завершена' };
+  const states = { paused: 'Автонастройка на паузе', disconnected: 'API Gift Satellite ещё не подключён', blocked: 'Настройка цен заблокирована', completed: 'Проверка завершена', error: 'Проверка не завершена' };
   return [
     `Gift Satellite — ежедневный отчёт\n${report.date}`,
     states[report.status] || 'Неизвестный результат',
     Number.isInteger(report.checked) ? `Проверено слотов: ${report.checked}` : null,
     Number.isInteger(report.changed) ? `Изменено лимитов: ${report.changed}` : null,
     Number.isInteger(report.skipped) ? `Пропущено: ${report.skipped}` : null,
+    report.reason === 'api_authorization_failed' ? 'Gift Satellite отклонил постоянный API-ключ. Требуется документированный формат авторизации.' : null,
+    report.reason === 'write_contract_unverified' ? 'Чтение API доступно; метод изменения лимитов ещё не проверен.' : null,
+    report.status === 'blocked' ? 'Цены в реальном приложении не изменялись.' : null,
     report.status === 'disconnected' ? 'Цены в реальном приложении не изменялись.' : null,
     report.status === 'error' ? 'Изменения прекращены. Нужно проверить подключение API.' : null,
     '/status — состояние · /pause — остановить · /resume — возобновить',
@@ -33,8 +36,7 @@ export async function handleCommand(update, { ownerId, store, send }) {
   return true;
 }
 
-// The provider adapter is deliberately absent until its real API contract is verified.
-// A future run receives this guard and must call it immediately before EVERY remote write.
+// Every provider write must call the pause guard immediately beforehand.
 export async function dailyReport({ store, send, run, now = new Date() }) {
   const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Moscow', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
   const lease = await store.claimDay(day);
@@ -58,7 +60,8 @@ export async function dailyReport({ store, send, run, now = new Date() }) {
           if (!Number.isSafeInteger(result?.[key]) || result[key] < 0) throw new Error('INVALID_REPORT');
           report[key] = result[key];
         }
-        report.status = 'completed';
+        report.status = result.status === 'blocked' ? 'blocked' : 'completed';
+        if (['api_authorization_failed', 'write_contract_unverified'].includes(result.reason)) report.reason = result.reason;
       }
     } catch {
       report.status = (await store.isPaused()) ? 'paused' : 'error';
