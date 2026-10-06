@@ -1,0 +1,55 @@
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    init: true
+    environment:
+      BOT_TOKEN: ${BOT_TOKEN:-}
+      OWNER_ID: ${OWNER_ID:-}
+      APP_ORIGIN: ${APP_ORIGIN:?Set APP_ORIGIN in .env}
+      HOST: 0.0.0.0
+      PORT: 4173
+      LOCAL_PREVIEW: 0
+      DATA_DIR: /app/data
+      MARKET_DATA_FILE: /feeds/market.json
+      MONITOR_INTERVAL_MS: ${MONITOR_INTERVAL_MS:-2000}
+      MAX_FEED_AGE_MS: ${MAX_FEED_AGE_MS:-10000}
+    volumes:
+      - app_data:/app/data
+      - ./data/feeds:/feeds:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+  proxy:
+    image: caddy:2
+    restart: unless-stopped
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?Set APP_DOMAIN in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+volumes:
+  app_data:
+  caddy_data:
+  caddy_config:

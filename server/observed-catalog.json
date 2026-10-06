@@ -1,0 +1,850 @@
+{
+  "observedAt": "2026-10-04",
+  "collections": [
+    "Satellite логотип",
+    "Lol Pop",
+    "Algorithm Cup",
+    "Intelligence Cup",
+    "Mirage Lamp",
+    "Artisan Brick",
+    "Astral Shard",
+    "B-Day Candle",
+    "Berry Box",
+    "Big Year",
+    "Bling Binky",
+    "Bonded Ring",
+    "Bow Tie",
+    "Bunny Muffin",
+    "Candy Cane",
+    "Chill Flame",
+    "Clover Pin",
+    "Cookie Heart",
+    "Crystal Ball",
+    "Cupid Charm",
+    "Desk Calendar",
+    "Diamond Ring",
+    "Durov’s Cap",
+    "Durov’s Glasses",
+    "Easter Egg",
+    "Electric Skull",
+    "Eternal Candle",
+    "Eternal Rose",
+    "Evil Eye",
+    "Faith Amulet",
+    "Fine Pen",
+    "Flying Broom",
+    "Fresh Socks",
+    "Gem Signet",
+    "Genie Lamp",
+    "Ginger Cookie",
+    "Hanging Star",
+    "Happy Brownie",
+    "Heart Locket",
+    "Heroic Helmet",
+    "Hex Pot",
+    "Holiday Drink",
+    "Homemade Cake",
+    "Hypno Lollipop",
+    "Ice Cream",
+    "Input Key",
+    "Instant Ramen",
+    "Ion Gem",
+    "Ionic Dryer",
+    "Jack-in-the-Box",
+    "Jelly Bunny",
+    "Jester Hat",
+    "Jingle Bells",
+    "Jolly Chimp",
+    "Joyful Bundle",
+    "Khabib’s Papakha",
+    "Kissed Frog",
+    "Liberty Figure",
+    "Light Sword",
+    "Loot Bag",
+    "Love Candle",
+    "Love Potion",
+    "Low Rider",
+    "Lunar Snake",
+    "Lush Bouquet",
+    "Mad Pumpkin",
+    "Magic Potion",
+    "Mighty Arm",
+    "Mini Oscar",
+    "Money Pot",
+    "Mood Pack",
+    "Moon Pendant",
+    "Mousse Cake",
+    "Nail Bracelet",
+    "Neko Helmet",
+    "Party Sparkler",
+    "Perfume Bottle",
+    "Pet Snake",
+    "Plush Pepe",
+    "Pool Float",
+    "Precious Peach",
+    "Pretty Posy",
+    "Rare Bird",
+    "Record Player",
+    "Restless Jar",
+    "Sakura Flower",
+    "Santa Hat",
+    "Scared Cat",
+    "Sharp Tongue",
+    "Signet Ring",
+    "Skull Flower",
+    "Sky Stilettos",
+    "Sleigh Bell",
+    "Snake Box",
+    "Snoop Cigar",
+    "Snoop Dogg",
+    "Snow Globe",
+    "Snow Mittens",
+    "Spiced Wine",
+    "Spring Basket",
+    "Spy Agaric",
+    "Star Notepad",
+    "Stellar Rocket",
+    "Surge Board",
+    "Swag Bag",
+    "Swiss Watch",
+    "Tama Gadget",
+    "Timeless Book",
+    "Top Hat",
+    "Toy Bear",
+    "Trapped Heart",
+    "UFC Strike",
+    "Valentine Box",
+    "Vice Cream",
+    "Victory Medal",
+    "Vintage Cigar",
+    "Voodoo Doll",
+    "Westside Sign",
+    "Whip Cupcake",
+    "Winter Wreath",
+    "Witch Hat",
+    "Xmas Stocking"
+  ],
+  "lolPop": {
+    "models": [
+      {
+        "name": "Satellite",
+        "rarity": 0.5
+      },
+      {
+        "name": "Glowstick",
+        "rarity": 0.5
+      },
+      {
+        "name": "Doodle Art",
+        "rarity": 0.5
+      },
+      {
+        "name": "Rosebud",
+        "rarity": 0.5
+      },
+      {
+        "name": "Einstein",
+        "rarity": 0.5
+      },
+      {
+        "name": "Cookie Dip",
+        "rarity": 0.5
+      },
+      {
+        "name": "Dark Sky",
+        "rarity": 0.5
+      },
+      {
+        "name": "Celestia",
+        "rarity": 0.5
+      },
+      {
+        "name": "Andromeda",
+        "rarity": 0.5
+      },
+      {
+        "name": "Angelina",
+        "rarity": 0.5
+      },
+      {
+        "name": "Milky Way",
+        "rarity": 0.5
+      },
+      {
+        "name": "Icicle",
+        "rarity": 0.5
+      },
+      {
+        "name": "Watermelon",
+        "rarity": 0.5
+      },
+      {
+        "name": "Mortal Sin",
+        "rarity": 0.5
+      },
+      {
+        "name": "Sick Leave",
+        "rarity": 0.5
+      },
+      {
+        "name": "Pumpkin",
+        "rarity": 0.5
+      },
+      {
+        "name": "Sweetheart",
+        "rarity": 0.5
+      },
+      {
+        "name": "Jolly Roger",
+        "rarity": 0.5
+      },
+      {
+        "name": "Blood Sucker",
+        "rarity": 0.5
+      },
+      {
+        "name": "Cobweb",
+        "rarity": 0.5
+      },
+      {
+        "name": "Love Bubbles",
+        "rarity": 1
+      },
+      {
+        "name": "Heart Pop",
+        "rarity": 1
+      },
+      {
+        "name": "Romance",
+        "rarity": 1
+      },
+      {
+        "name": "Magic Wand",
+        "rarity": 1
+      },
+      {
+        "name": "Crystal Comet",
+        "rarity": 1
+      },
+      {
+        "name": "Comic Crunch",
+        "rarity": 1
+      },
+      {
+        "name": "Nostalgia",
+        "rarity": 1
+      },
+      {
+        "name": "Jinxed",
+        "rarity": 1
+      },
+      {
+        "name": "Soap Bubbles",
+        "rarity": 1
+      },
+      {
+        "name": "Red Shift",
+        "rarity": 1
+      },
+      {
+        "name": "Sailor Moon",
+        "rarity": 1
+      },
+      {
+        "name": "Portable Pop",
+        "rarity": 1
+      },
+      {
+        "name": "Plastic Ice",
+        "rarity": 1
+      },
+      {
+        "name": "Crystalline",
+        "rarity": 1
+      },
+      {
+        "name": "Pink Foil",
+        "rarity": 1
+      },
+      {
+        "name": "Wonka Berry",
+        "rarity": 1
+      },
+      {
+        "name": "Lagoon",
+        "rarity": 1
+      },
+      {
+        "name": "Hollywood",
+        "rarity": 1
+      },
+      {
+        "name": "Shock Wave",
+        "rarity": 1
+      },
+      {
+        "name": "Blue Goo",
+        "rarity": 1
+      },
+      {
+        "name": "Liquid Lime",
+        "rarity": 1
+      },
+      {
+        "name": "Golden Amber",
+        "rarity": 1
+      },
+      {
+        "name": "Rising Star",
+        "rarity": 1
+      },
+      {
+        "name": "Gold Star",
+        "rarity": 1
+      },
+      {
+        "name": "Blood Ember",
+        "rarity": 1
+      },
+      {
+        "name": "Icy Touch",
+        "rarity": 1
+      },
+      {
+        "name": "Hexed Helix",
+        "rarity": 1
+      },
+      {
+        "name": "Fire Vortex",
+        "rarity": 1
+      },
+      {
+        "name": "Dark Portal",
+        "rarity": 1
+      },
+      {
+        "name": "Cosmic Green",
+        "rarity": 1
+      },
+      {
+        "name": "Dark Delight",
+        "rarity": 1.2
+      },
+      {
+        "name": "Sugar Free",
+        "rarity": 1.2
+      },
+      {
+        "name": "Orangery",
+        "rarity": 1.2
+      },
+      {
+        "name": "Gobstopper",
+        "rarity": 1.2
+      },
+      {
+        "name": "Cotton Candy",
+        "rarity": 1.2
+      },
+      {
+        "name": "Citrone",
+        "rarity": 1.2
+      },
+      {
+        "name": "Grape Gin",
+        "rarity": 1.2
+      },
+      {
+        "name": "Refresh",
+        "rarity": 1.2
+      },
+      {
+        "name": "Honey Bee",
+        "rarity": 1.2
+      },
+      {
+        "name": "Wild Mango",
+        "rarity": 1.2
+      },
+      {
+        "name": "Old Liqueur",
+        "rarity": 1.2
+      },
+      {
+        "name": "Lavender Ice",
+        "rarity": 1.2
+      },
+      {
+        "name": "Pina Colada",
+        "rarity": 1.2
+      },
+      {
+        "name": "Prisma",
+        "rarity": 1.2
+      },
+      {
+        "name": "Pineapple",
+        "rarity": 1.2
+      },
+      {
+        "name": "Mint Lemon",
+        "rarity": 1.2
+      },
+      {
+        "name": "Blender",
+        "rarity": 1.2
+      },
+      {
+        "name": "Delusion",
+        "rarity": 1.2
+      },
+      {
+        "name": "Holidaze",
+        "rarity": 1.2
+      },
+      {
+        "name": "Cherry Cola",
+        "rarity": 1.2
+      },
+      {
+        "name": "Rose Wine",
+        "rarity": 1.2
+      },
+      {
+        "name": "Vanilla Swirl",
+        "rarity": 1.2
+      },
+      {
+        "name": "Pumpkin Latte",
+        "rarity": 1.2
+      },
+      {
+        "name": "Melon Spin",
+        "rarity": 1.2
+      },
+      {
+        "name": "Vanilla Jam",
+        "rarity": 1.2
+      },
+      {
+        "name": "Mirage",
+        "rarity": 1.2
+      },
+      {
+        "name": "Mandarin",
+        "rarity": 1.2
+      },
+      {
+        "name": "Milkshake",
+        "rarity": 1.2
+      },
+      {
+        "name": "Tsunami",
+        "rarity": 1.2
+      },
+      {
+        "name": "Sweet Yogurt",
+        "rarity": 1.2
+      },
+      {
+        "name": "Mandarin Ice",
+        "rarity": 1.2
+      },
+      {
+        "name": "Spicy Tequila",
+        "rarity": 1.2
+      },
+      {
+        "name": "Cucumber",
+        "rarity": 1.2
+      },
+      {
+        "name": "Cherry Milk",
+        "rarity": 1.2
+      },
+      {
+        "name": "Iced Latte",
+        "rarity": 1.2
+      },
+      {
+        "name": "Cappuccino",
+        "rarity": 1.2
+      },
+      {
+        "name": "Blueberry Pie",
+        "rarity": 1.2
+      },
+      {
+        "name": "Cherry Berry",
+        "rarity": 1.2
+      },
+      {
+        "name": "Plum Candy",
+        "rarity": 1.2
+      },
+      {
+        "name": "Choco Mint",
+        "rarity": 1.2
+      },
+      {
+        "name": "Spearmint",
+        "rarity": 1.2
+      },
+      {
+        "name": "Sunset Blue",
+        "rarity": 1.2
+      },
+      {
+        "name": "Choco Pop",
+        "rarity": 1.2
+      },
+      {
+        "name": "Rainbow Dash",
+        "rarity": 1.2
+      },
+      {
+        "name": "Spectrum",
+        "rarity": 1.2
+      },
+      {
+        "name": "Lychee Mint",
+        "rarity": 1.2
+      },
+      {
+        "name": "Bubblegum",
+        "rarity": 1.2
+      },
+      {
+        "name": "Caramel",
+        "rarity": 1.2
+      },
+      {
+        "name": "Bitter Lemon",
+        "rarity": 1.2
+      },
+      {
+        "name": "Red Grape",
+        "rarity": 1.2
+      }
+    ],
+    "backdrops": [
+      "Black",
+      "Onyx Black",
+      "Chocolate",
+      "Battleship Grey",
+      "Midnight Blue",
+      "Indigo Dye",
+      "Cobalt Blue",
+      "Neon Blue",
+      "Electric Indigo",
+      "Cyberpunk",
+      "Lavender",
+      "Electric Purple",
+      "Grape",
+      "Purple",
+      "English Violet",
+      "Dark Lilac",
+      "Fandango",
+      "Mystic Pearl",
+      "Raspberry",
+      "Burgundy",
+      "Strawberry",
+      "Coral Red",
+      "Persimmon",
+      "Carrot Juice",
+      "Orange",
+      "Copper",
+      "Chestnut",
+      "Rosewood",
+      "Cappuccino",
+      "Amber",
+      "Caramel",
+      "Pure Gold",
+      "Satin Gold",
+      "Desert Sand",
+      "Light Olive",
+      "Khaki Green",
+      "Lemongrass",
+      "Shamrock Green",
+      "Malachite",
+      "Pine Green",
+      "Hunter Green",
+      "Pistachio",
+      "Emerald",
+      "Mint Green",
+      "Pacific Green",
+      "Jade Green",
+      "Turquoise",
+      "Aquamarine",
+      "Pacific Cyan",
+      "Moonstone",
+      "Silver Blue",
+      "French Blue",
+      "Azure Blue",
+      "Sky Blue",
+      "Sapphire",
+      "Navy Blue",
+      "Steel Grey",
+      "Roman Silver",
+      "Platinum",
+      "Ivory White"
+    ],
+    "symbols": [
+      "Acorn",
+      "Alert Serpent",
+      "All-Seeing Eye",
+      "Anchor",
+      "Ancient Urn",
+      "Anubis",
+      "Apple",
+      "Arcane Mirror",
+      "Aztec Falcon",
+      "Aztec Totem",
+      "Baby Bottle",
+      "Ball",
+      "Banner",
+      "Bastet",
+      "Bee",
+      "Beer",
+      "Bell Pepper",
+      "Birthday Cake",
+      "Blood Drop",
+      "Boat",
+      "Bone",
+      "Book",
+      "Bottle",
+      "Bottlenose",
+      "Bow Tie",
+      "Brain",
+      "Bread",
+      "Breeze",
+      "Bunny",
+      "Burger",
+      "Cactus",
+      "Calm Wolf",
+      "Candy",
+      "Carambola",
+      "Carrot",
+      "Cat Mask",
+      "Celtic Cross",
+      "Champagne",
+      "Cheese",
+      "Chest",
+      "Chili Pepper",
+      "Coat of Arms",
+      "Cobra",
+      "Cocktail",
+      "Coconut",
+      "Coin",
+      "Coin Purse",
+      "Conch",
+      "Cone",
+      "Corn",
+      "Cow Skull",
+      "Crab",
+      "Crescent",
+      "Crown",
+      "Crusader",
+      "Crusader Cross",
+      "Crystal Ball",
+      "Cupcake",
+      "Cursor",
+      "Dagger",
+      "Diamonds",
+      "Dice",
+      "Doberman",
+      "Doghouse",
+      "Double Axe",
+      "Duck Face",
+      "Eagle",
+      "Earth",
+      "Egg",
+      "Eggplant",
+      "Eikthyrnir",
+      "Elephant",
+      "Evil Dragon",
+      "Feather",
+      "Fenrir",
+      "Firebird",
+      "Fish",
+      "Fishing Hook",
+      "Flag",
+      "Flashlight",
+      "Flower",
+      "Flower Sun",
+      "Flower Tulip",
+      "Full Moon",
+      "Galaxy",
+      "Gamepad",
+      "Garden Pot",
+      "Gear",
+      "Gem",
+      "Genie Lamp",
+      "Ghost",
+      "Gingerbread",
+      "Glasses",
+      "Gold",
+      "Golden Scarab",
+      "Grape",
+      "Greek Helmet",
+      "Greek Sun",
+      "Grenade",
+      "Griffon",
+      "Guitar",
+      "Hammerhead",
+      "Handset",
+      "Heater Shield",
+      "Hedgehog",
+      "Hermit Shell",
+      "Hippo",
+      "Holy Grail",
+      "Horn",
+      "Horseshoe",
+      "Hourglass",
+      "Ice Cream",
+      "Illuminati",
+      "Imperial Lion",
+      "Inca Sun",
+      "Inguz Rune",
+      "Iron Helmet",
+      "Jellyfish",
+      "Jewel",
+      "Jolly Roger",
+      "Jörmungandr",
+      "Khinkali",
+      "Kite",
+      "Kitsune",
+      "Kitsune Mask",
+      "Koala",
+      "Kudu Totem",
+      "Leaf",
+      "Legionary",
+      "Lemon Slice",
+      "Light Bulb",
+      "Lightning",
+      "Lily",
+      "Lion Head",
+      "Lion King",
+      "Lotus Flower",
+      "Love Lock",
+      "Lovely Kiss",
+      "Mafdet",
+      "Magic Vial",
+      "Magic Wand",
+      "Mannaz Rune",
+      "Maple",
+      "Maple Leaf",
+      "Mask",
+      "Mayan Moth",
+      "Melon",
+      "Monarch",
+      "Money Bag",
+      "Moon",
+      "Moon Cross",
+      "Moon Eagle",
+      "Moon Face",
+      "Moose Head",
+      "Morgenstern",
+      "Mushroom",
+      "Mustang",
+      "Narcissus",
+      "Nemean Lion",
+      "Nigiri",
+      "Octopus",
+      "Old Candle",
+      "Onigiri",
+      "Origami",
+      "Ouroboros",
+      "Oxen of Fire",
+      "Palette",
+      "Paper Crane",
+      "Pawn",
+      "Pear",
+      "Pearl",
+      "Pickaxe",
+      "Piggy Bank",
+      "Piñata",
+      "Pineapple",
+      "Piranha",
+      "Pizza Slice",
+      "Planet",
+      "Plume",
+      "Polar Bear",
+      "Pomegranate",
+      "Pumpkin Coach",
+      "Puzzle",
+      "Radar",
+      "Rain Drop",
+      "Ramen",
+      "Rhino Warrior",
+      "Ribeye Steak",
+      "Ring",
+      "Rocket",
+      "Rose",
+      "Royal Crown",
+      "Sakura",
+      "Sea Dragon",
+      "Sea Jelly",
+      "Seahorse",
+      "Shell",
+      "Shield",
+      "Shinto Shrine",
+      "Shooting Star",
+      "Shuriken",
+      "Skull",
+      "Sleepy Unicorn",
+      "Snail",
+      "Spades",
+      "Sparks",
+      "Spider",
+      "Spider Web",
+      "Sprout",
+      "Star Crown",
+      "Sun Lion",
+      "Sun Mountain",
+      "Sushi Rolls",
+      "Sword",
+      "Takoyaki",
+      "Tamagotchi",
+      "Telescope",
+      "Teru Bōzu",
+      "Tetsubin",
+      "The Eye",
+      "Thief",
+      "Thor Hammer",
+      "Thunderbird",
+      "Toilet",
+      "Tooth",
+      "Top Hat",
+      "Totem Bear",
+      "Tree of Life",
+      "Trickster Fox",
+      "Trinity Knot",
+      "Tsunami",
+      "Turkey",
+      "Turtle",
+      "Twin Peaks",
+      "Two Katanas",
+      "UFO",
+      "Unicorn",
+      "Unicorn Head",
+      "Venetian Mask",
+      "Viking",
+      "Viking Shield",
+      "Viper",
+      "Vortex",
+      "Wagasa",
+      "War Tiger",
+      "Wasp",
+      "Watching Sun",
+      "Wepwawet",
+      "White Deer",
+      "Winged Helm",
+      "Wise Raven",
+      "Wontons",
+      "Worker Ant",
+      "Wreath",
+      "Yogi Shaman"
+    ]
+  }
+}

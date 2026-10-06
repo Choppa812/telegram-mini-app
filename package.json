@@ -5,11 +5,15 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "start": "node --env-file-if-exists=.env server/index.js",
+    "test": "node --test server/core.test.js server/integration.test.js server/notifications.test.js src/domain.test.js src/visuals.test.js"
   },
   "dependencies": {
     "@tma.js/sdk-react": "^3.0.8",
+    "@ton/core": "^0.63.1",
     "@tonconnect/sdk": "^3.3.1",
+    "@tonconnect/ui": "^3.0.2",
     "qrcode.react": "^4.2.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
