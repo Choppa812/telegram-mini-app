@@ -1,12 +1,12 @@
 const BASE = 'https://gift-satellite.dev/api';
-const MODES = ['auth-token', 'authorization', 'bearer', 'x-api-key'];
+const MODES = ['api-key-scheme', 'api-scheme', 'x-api-token', 'auth-token', 'authorization', 'bearer', 'x-api-key'];
 
 export async function readSatellite(path, params, key, mode, fetcher = fetch) {
   if (!['/user/subscriptions', '/gift/collections', '/history/floors'].includes(path)) throw new Error('UNSUPPORTED_READ_PATH');
   if (!key || !MODES.includes(mode)) throw new Error('SATELLITE_CONFIGURATION_MISSING');
   const url = new URL(BASE + path);
   for (const [name, value] of Object.entries(params || {})) url.searchParams.set(name, String(value));
-  const headers = mode === 'auth-token' ? { authToken: key } : mode === 'x-api-key' ? { 'X-API-Key': key } : { Authorization: mode === 'bearer' ? `Bearer ${key}` : key };
+  const headers = mode === 'x-api-token' ? { 'X-API-Token': key } : mode === 'auth-token' ? { authToken: key } : mode === 'x-api-key' ? { 'X-API-Key': key } : { Authorization: mode === 'api-key-scheme' ? `ApiKey ${key}` : mode === 'api-scheme' ? `Api ${key}` : mode === 'bearer' ? `Bearer ${key}` : key };
   const response = await fetcher(url, { method: 'GET', headers: { ...headers, Accept: 'application/json' }, redirect: 'error', signal: AbortSignal.timeout(12000) });
   if (!response.ok) {
     let message;

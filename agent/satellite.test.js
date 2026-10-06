@@ -15,7 +15,7 @@ test('API probe uses only observed read endpoints and never sends writes or keys
 test('authorization failure is reported without market requests or exposing provider response', async()=>{
   let calls=0;
   const result=await probeSatellite('secret',async()=>{calls++;return {ok:false,status:401};});
-  assert.equal(result.ok,false); assert.equal(calls,4); assert.equal(result.attempts.length,4);
+  assert.equal(result.ok,false); assert.equal(calls,7); assert.equal(result.attempts.length,7);
 });
 test('probe does not retry provider failures and blocks unsupported paths', async()=>{
   let calls=0;
