@@ -12,6 +12,30 @@ export default function SettingsPage({
   return (
     <>
       <h1>Настройки</h1>
+      <h3>Ежедневная оценка цен</h3>
+      <section className="panel">
+        <Switch label="Пересчитывать цену покупки каждый день"
+          value={settings.dailyPricing !== false} onChange={v => config("dailyPricing", v)} />
+        <p>Минимальная цена коллекции или комбинации с Black минус минимум 5 GRAM.
+          При слабом спросе запас увеличивается до 25% минимума.</p>
+        <p className="hint">Капитал: 50 GRAM · планируемый резерв: 10 GRAM · одна покупка с комиссией: до 10 GRAM.
+          Для оценки нужны подтверждённые продажи за полные сутки или больше.
+          Устаревшие данные, неизвестные комиссии и слишком редкие продажи блокируют покупку.</p>
+        <p role="status">{data.pricing?.connected ?
+          (data.pricing.stale ? "Цены требуют обновления" : "Пороги рассчитаны") :
+          "Ожидается подключение источника цен и продаж"}</p>
+        {data.pricing?.lastSuccess && <p className="hint">Последний пересчёт: {
+          new Date(data.pricing.lastSuccess).toLocaleString("ru-RU", {timeZone: "Europe/Moscow"})} МСК</p>}
+        {data.pricing?.error && <p className="hint">{data.pricing.error}</p>}
+        {data.pricing?.rules?.length > 0 && <details>
+          <summary>Минимумы и пороги ({data.pricing.rules.length})</summary>
+          {data.pricing.rules.map(r => <div className="panel" key={JSON.stringify([r.collection,r.backdrop,r.model])}>
+            <strong>{r.collection} · {r.backdrop === "*" ? "Все фоны" : r.backdrop} · {r.model === "*" ? "Все модели" : r.model}</strong>
+            <p>Минимум: {r.floorGram ?? "—"} GRAM · покупка до: {data.pricing.stale ? "—" : r.buyLimitGram ?? "—"} GRAM</p>
+            <small>{data.pricing.stale ? "Данные устарели; покупка заблокирована" : r.reason}</small>
+          </div>)}
+        </details>}
+      </section>
       <h3>Язык</h3>
       <div className="chips languages">
         {[

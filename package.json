@@ -7,7 +7,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "start": "node --env-file-if-exists=.env server/index.js",
-    "test": "node --test server/core.test.js server/integration.test.js server/notifications.test.js src/domain.test.js src/visuals.test.js"
+    "test": "node --test server/core.test.js server/pricing.test.js server/integration.test.js server/notifications.test.js src/domain.test.js src/visuals.test.js"
   },
   "dependencies": {
     "@tma.js/sdk-react": "^3.0.8",

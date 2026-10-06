@@ -19,6 +19,7 @@ import {
   monitorConfig,
 } from "./core.js";
 import { matchingSales } from "./notifications.js";
+import { PRICING_POLICY, calculatePricing, pricingForSubscription, pricingDue } from "./pricing.js";
 const local = process.env.LOCAL_PREVIEW === "1",
   root = resolve("dist"),
   dataDir = resolve(process.env.DATA_DIR || "data"),
@@ -31,6 +32,7 @@ db.exec(
   "PRAGMA journal_mode=WAL; CREATE TABLE IF NOT EXISTS subscriptions(id TEXT PRIMARY KEY,body TEXT NOT NULL);CREATE TABLE IF NOT EXISTS settings(id INTEGER PRIMARY KEY,body TEXT NOT NULL);CREATE TABLE IF NOT EXISTS events(key TEXT PRIMARY KEY,state TEXT NOT NULL);CREATE TABLE IF NOT EXISTS purchases(id TEXT PRIMARY KEY,body TEXT NOT NULL);CREATE TABLE IF NOT EXISTS api_access(id INTEGER PRIMARY KEY,hash TEXT NOT NULL,created_at TEXT NOT NULL)",
 );
 const defaults = {
+  dailyPricing: true,
   notifications: true,
   salesNotifications: false,
   autoBuy: false,
@@ -38,7 +40,7 @@ const defaults = {
   exclusions: [],
   presets: [],
 };
-const subscriptions = () =>
+const rawSubscriptions = () =>
   db
     .prepare("SELECT id,body FROM subscriptions ORDER BY rowid DESC")
     .all()
@@ -49,6 +51,35 @@ const settings = () => ({
     db.prepare("SELECT body FROM settings WHERE id=1").get()?.body || "{}",
   ),
 });
+db.exec("CREATE TABLE IF NOT EXISTS pricing(id INTEGER PRIMARY KEY,body TEXT NOT NULL)");
+let pricingState = JSON.parse(db.prepare("SELECT body FROM pricing WHERE id=1").get()?.body || "null");
+let pricingError = "", pricingAttempt = 0, pricingChecking = false;
+const subscriptions = () => rawSubscriptions().map(s => settings().dailyPricing ?
+  { ...s, ...pricingForSubscription(s, pricingState), dailyPricing: true } :
+  { ...s, dailyPricing: false, pricingBlocked: false });
+const pricingStatus = () => ({ ...PRICING_POLICY, ...pricingState,
+  enabled: settings().dailyPricing, connected: !!process.env.MARKET_ANALYSIS_FILE,
+  stale: !pricingState || Date.now() - Date.parse(pricingState.snapshotAt) >= PRICING_POLICY.intervalMs,
+  error: pricingError, lastAttempt: pricingAttempt ? new Date(pricingAttempt).toISOString() : null,
+  rules: pricingState?.rules || [] });
+async function refreshPricing() {
+  const now = Date.now();
+  if (pricingChecking || !settings().dailyPricing ||
+      !pricingDue(pricingState?.snapshotAt, now) || now - pricingAttempt < 300000) return;
+  pricingChecking = true;
+  pricingAttempt = now;
+  try {
+    if (!process.env.MARKET_ANALYSIS_FILE) throw Error("Источник минимумов и истории продаж не подключён");
+    const snapshot = JSON.parse(await readFile(resolve(process.env.MARKET_ANALYSIS_FILE), "utf8"));
+    const next = calculatePricing(snapshot, now, catalog.map(c => c.name));
+    db.prepare("INSERT INTO pricing VALUES(1,?) ON CONFLICT(id) DO UPDATE SET body=excluded.body")
+      .run(JSON.stringify(next));
+    pricingState = next;
+    pricingError = "";
+  } catch (e) {
+    pricingError = e instanceof SyntaxError ? "Некорректный снимок рынка" : e.message;
+  } finally { pricingChecking = false; }
+}
 const session = randomBytes(32).toString("hex");
 let feedError = "",
   monitorError = "",
@@ -160,7 +191,10 @@ const server = createServer(async (req, res) => {
           feedError,
           monitorError,
           lastCheck,
+          pricing: pricingStatus(),
         });
+      if (path === "/api/pricing" && method === "GET")
+        return send(res, 200, pricingStatus());
       if (path === "/api/catalog" && method === "GET")
         return send(res, 200, f?.catalog || catalog);
       if (path === "/api/tools" && method === "GET")
@@ -460,6 +494,9 @@ async function monitor() {
 }
 const interval = setInterval(monitor, monitorOptions.intervalMs);
 interval.unref();
+const pricingInterval = setInterval(refreshPricing, 60000);
+pricingInterval.unref();
+await refreshPricing();
 server.listen(
   Number(process.env.PORT || 4173),
   local ? "127.0.0.1" : process.env.HOST || "127.0.0.1",
@@ -470,6 +507,7 @@ server.listen(
 );
 const stop = () => {
   clearInterval(interval);
+  clearInterval(pricingInterval);
   server.close(() => {
     db.close();
     process.exit(0);

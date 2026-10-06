@@ -165,6 +165,7 @@ export function validateSettings(body) {
     throw Error("Неизвестный язык");
   return {
     notifications: body.notifications,
+    dailyPricing: body.dailyPricing !== false,
     salesNotifications: !!body.salesNotifications,
     autoBuy: false,
     language,
