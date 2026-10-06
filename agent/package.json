@@ -1,0 +1,1 @@
+{"name":"gift-satellite-controller","private":true,"type":"module","scripts":{"test":"node --test control.test.js"}}
