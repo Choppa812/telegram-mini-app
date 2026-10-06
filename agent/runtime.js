@@ -7,6 +7,7 @@ export function sameSecret(actual, expected) {
 }
 
 export function runtime(env = process.env, fetcher = fetch) {
+  env = { ...env, UPSTASH_REDIS_REST_URL: env.UPSTASH_REDIS_REST_URL || env.KV_REST_API_URL, UPSTASH_REDIS_REST_TOKEN: env.UPSTASH_REDIS_REST_TOKEN || env.KV_REST_API_TOKEN };
   const required = ['CONTROL_BOT_TOKEN', 'CONTROL_OWNER_ID', 'UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN'];
   if (required.some(key => !env[key])) throw new Error('CONTROL_CONFIGURATION_MISSING');
   if (!/^\d+$/.test(env.CONTROL_OWNER_ID)) throw new Error('INVALID_OWNER');

@@ -93,3 +93,9 @@ test('storage outage prevents provider writes', async () => {
   assert.equal(calls, 0);
   assert.equal(s.state.lease, null);
 });
+test('Vercel KV integration variables are accepted without reading read-only credentials', async () => {
+  const calls=[];
+  const r=runtime({CONTROL_BOT_TOKEN:'token',CONTROL_OWNER_ID:'42',KV_REST_API_URL:'https://redis.example.test',KV_REST_API_TOKEN:'write-token',KV_REST_API_READ_ONLY_TOKEN:'read-token'},async(url,options)=>{calls.push(options);return {ok:true,json:async()=>({result:null})};});
+  assert.equal(await r.store.isPaused(),true);
+  assert.equal(calls[0].headers.Authorization,'Bearer write-token');
+});
