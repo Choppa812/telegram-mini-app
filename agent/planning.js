@@ -8,10 +8,11 @@ export async function readPositions(key, fetcher=fetch) {
   return {ok:true,balance:profile.data?.tonBalance??null,limit:profile.data?.subscriptionLimit??null,autobuyEnabled:profile.data?.isAutobuyEnabled??null,rows:slots.data.map(s=>({name:s.subscriptionName??'',collection:s.collectionName,models:s.modelNames??[],backdrops:s.backdropNames??[],active:s.portalsAutobuy===true,maxPrice:s.portalsAutobuyMaxPrice,quantity:s.portalsAutobuyQuantity,markets:['Tg','Portals','Tonnel','Mrkt'].filter((name,i)=>[s.autobuyTg,s.autobuyPortals,s.autobuyTonnel,s.autobuyMrkt][i])})),writesPerformed:0};
 }
 
-export function positionsText(result) {
+export function positionsText(result, filter='') {
   if (!result?.ok) return `Слоты не удалось прочитать: HTTP ${(result?.statuses||[]).join('/')}.`;
   const f=n=>Number.isFinite(n)?n.toFixed(2):'—';
-  return [`Gift Satellite — текущие слоты. Баланс ${f(result.balance)} TON; слотов ${result.rows.length}/${result.limit??'?'}, глобальный автобай ${result.autobuyEnabled===null?'?':result.autobuyEnabled?'вкл':'выкл'}.`,...result.rows.map((s,i)=>`${i+1}. ${s.name||s.collection}: ${s.collection}, фон ${s.backdrops.join(',')||'любой'}, модели ${s.models.join(',')||'любые'}, ${s.active?'автобай':'без автобая'} ${f(s.maxPrice)} TON × ${s.quantity??'?'} [${s.markets.join(',')}]`),'Чтение без изменений.'].join('\n').slice(0,3900);
+  const rows=result.rows.map((s,i)=>({s,i})).filter(({s})=>!filter||s.collection.toLowerCase().includes(filter.toLowerCase()));
+  return [`Gift Satellite — текущие слоты. Баланс ${f(result.balance)} TON; слотов ${result.rows.length}/${result.limit??'?'}, глобальный автобай ${result.autobuyEnabled===null?'?':result.autobuyEnabled?'вкл':'выкл'}.`,...rows.map(({s,i})=>`${i+1}. ${s.collection}, фон ${s.backdrops.join(',')||'любой'}, модели ${filter?(s.models.join(',')||'любые'):`${s.models.length||'все'} шт.`}, ${s.active?'автобай':'без автобая'} ${f(s.maxPrice)} TON × ${s.quantity??'?'} [${s.markets.join(',')}]`),'Чтение без изменений.'].join('\n').slice(0,3900);
 }
 
 export async function readBlackModels(collection,key,fetcher=fetch,now=new Date(),pause=ms=>new Promise(resolve=>setTimeout(resolve,ms))) {

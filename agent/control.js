@@ -25,7 +25,8 @@ export async function handleCommand(update, { ownerId, store, send, checkApi, ma
   if (!['/start', '/help', '/status', '/report', '/pause', '/resume', '/checkapi', '/market', '/floors', '/inspect', '/fees', '/rank', '/blackday', '/blackscan', '/positions', '/models'].includes(command)) return false;
   if (!Number.isSafeInteger(update.update_id)) return false;
   if (command === '/positions') {
-    try { await send(await positionsOverview()); }
+    const filter=(m.text||'').trim().replace(/^\S+\s*/,'').trim();
+    try { await send(await positionsOverview(filter)); }
     catch { await send('Текущие слоты не удалось прочитать.'); }
   } else if (command === '/models') {
     const collection=(m.text||'').trim().replace(/^\S+\s*/,'').trim();
