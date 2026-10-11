@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyBlackPlan } from './trading.js';
+import { applyBlackPlan,cleanBlackBatch } from './trading.js';
 
 const slots=[
   {_id:'aaaaaaaaaaaaaaaaaaaaaaaa',subscriptionName:'Vice',collectionName:'Vice Cream',modelNames:[],backdropNames:['Black'],portalsAutobuy:true,portalsAutobuyMaxPrice:13,portalsAutobuyQuantity:1,autobuyTg:true,autobuyPortals:true,autobuyTonnel:true,autobuyMrkt:true},
@@ -42,4 +42,19 @@ test('pause guard blocks writes',async()=>{
   };
   await assert.rejects(applyBlackPlan('test',{fetcher,beforeWrite:async()=>{throw new Error('AUTOMATION_PAUSED');},pause:async()=>{}}),/AUTOMATION_PAUSED/);
   assert.equal(writes,0);
+});
+
+test('cleanup disables legacy autobuy without changing target collections',async()=>{
+  const state=[...structuredClone(slots),{...structuredClone(slots[0]),_id:'cccccccccccccccccccccccc',collectionName:'Lol Pop',backdropNames:[],portalsAutobuyMaxPrice:17}];
+  const fetcher=async(url,options)=>{
+    const path=new URL(url).pathname;
+    if(path.endsWith('/user/subscriptions'))return reply(state);
+    if(path.includes('/update-subscription/')){Object.assign(state[2],JSON.parse(options.body));return reply(null);}
+    throw new Error(path);
+  };
+  const result=await cleanBlackBatch('test',0,{fetcher,beforeWrite:async()=>{},pause:async()=>{}});
+  assert.equal(result.processed,1);
+  assert.equal(state[2].portalsAutobuy,false);
+  assert.equal(state[0].portalsAutobuy,true);
+  assert.equal(state[1].portalsAutobuy,true);
 });

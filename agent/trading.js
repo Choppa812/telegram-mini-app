@@ -12,6 +12,31 @@ function subscriptionBody(slot, plan, price) {
   return { ...body, modelNames:plan.models, backdropNames:['Black'], portalsAutobuyMaxPrice:price };
 }
 
+export async function cleanBlackBatch(key, batch, {beforeWrite,fetcher=fetch,pause=ms=>new Promise(resolve=>setTimeout(resolve,ms))}={}) {
+  if(!key||typeof beforeWrite!=='function'||!Number.isInteger(batch)||batch<0||batch>10)throw new Error('CLEAN_CONFIGURATION_MISSING');
+  const response=await readSatellite('/user/subscriptions',{},key,'token',fetcher);
+  if(!response.ok||!Array.isArray(response.data))throw new Error('ACCOUNT_READ_FAILED');
+  const keep=new Set(BLACK_PLAN.map(p=>p.collection));
+  const legacy=response.data.filter(s=>!keep.has(s.collectionName)||JSON.stringify(s.backdropNames)!=='["Black"]');
+  const selected=legacy.slice(batch*4,batch*4+4);
+  const details=[];
+  for(const slot of selected){
+    if(slot.portalsAutobuy!==true){details.push(`${slot.collectionName}: уже выключен`);continue;}
+    const body=subscriptionBody(slot,{models:slot.modelNames||[]},slot.portalsAutobuyMaxPrice);
+    body.backdropNames=slot.backdropNames||[];
+    body.portalsAutobuy=false;
+    await beforeWrite();
+    await writeSubscription(slot._id,body,key,fetcher);
+    await pause(600);
+    const verify=await readSatellite('/user/subscriptions',{},key,'token',fetcher);
+    const current=verify.ok&&Array.isArray(verify.data)?verify.data.find(s=>s._id===slot._id):null;
+    if(!current||current.portalsAutobuy!==false)throw new Error(`CLEAN_NOT_VERIFIED_${slot.collectionName}`);
+    details.push(`${slot.collectionName}: автобай выключен`);
+    await pause(600);
+  }
+  return {batch,totals:legacy.length,processed:selected.length,remaining:Math.max(0,legacy.length-(batch+1)*4),details};
+}
+
 async function blackFloor(collection, key, fetcher) {
   const prices=[];
   for (const market of ['portals','mrkt']) {

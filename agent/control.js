@@ -19,13 +19,21 @@ export function reportText(report) {
   ].filter(Boolean).join('\n');
 }
 
-export async function handleCommand(update, { ownerId, store, send, checkApi, marketOverview, floorOverview, inspectGift, feeOverview, turnoverOverview, blackDailySales, blackScan, positionsOverview, blackModels, applyBlack }) {
+export async function handleCommand(update, { ownerId, store, send, checkApi, marketOverview, floorOverview, inspectGift, feeOverview, turnoverOverview, blackDailySales, blackScan, positionsOverview, blackModels, applyBlack, cleanBlack }) {
   const m = update?.message;
   if (!ownerId || m?.chat?.type !== 'private' || String(m?.from?.id) !== String(ownerId) || String(m?.chat?.id) !== String(ownerId)) return false;
   const command = (m.text || '').trim().split(/\s/)[0].split('@')[0].toLowerCase();
-  if (!['/start', '/help', '/status', '/report', '/pause', '/resume', '/checkapi', '/market', '/floors', '/inspect', '/fees', '/rank', '/blackday', '/blackscan', '/positions', '/models', '/applyblack'].includes(command)) return false;
+  if (!['/start', '/help', '/status', '/report', '/pause', '/resume', '/checkapi', '/market', '/floors', '/inspect', '/fees', '/rank', '/blackday', '/blackscan', '/positions', '/models', '/applyblack', '/blackclean'].includes(command)) return false;
   if (!Number.isSafeInteger(update.update_id)) return false;
-  if (command === '/applyblack') {
+  if (command === '/blackclean') {
+    const batch=Number((m.text||'').trim().replace(/^\S+\s*/,'').trim());
+    if(!Number.isInteger(batch)||batch<0||batch>10)await send('Укажите пакет: /blackclean 0');
+    else if(await store.isPaused())await send('Автонастройка на паузе. Для изменения слотов сначала /resume.');
+    else try {
+      const result=await cleanBlack(batch,{beforeWrite:async()=>{if(await store.isPaused())throw new Error('AUTOMATION_PAUSED');}});
+      await send(`Black — очистка ${batch}: ${result.details.join('; ')}. Осталось просмотреть ${result.remaining}.`);
+    } catch(error){await send(`Black — очистка прервана: ${String(error?.message||'ERROR').replace(/[^A-Z0-9_ .-]/g,'').slice(0,100)}. Проверьте /positions.`);}
+  } else if (command === '/applyblack') {
     if (await store.isPaused()) await send('Автонастройка на паузе. Для изменения слотов сначала /resume.');
     else try {
       const result=await applyBlack({ beforeWrite:async()=>{if(await store.isPaused())throw new Error('AUTOMATION_PAUSED');} });
