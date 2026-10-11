@@ -59,7 +59,11 @@ async function blackFloor(collection, key, fetcher) {
 async function writeSubscription(id, body, key, fetcher) {
   if(!/^[a-f0-9]{24}$/i.test(id||''))throw new Error('INVALID_SUBSCRIPTION_ID');
   const response=await fetcher(new URL(`${BASE}/user/update-subscription/${id}`),{method:'PUT',headers:{Authorization:`Token ${key}`,Accept:'application/json','Content-Type':'application/json'},body:JSON.stringify(body),redirect:'error',signal:AbortSignal.timeout(12000)});
-  if(!response.ok)throw new Error(`UPDATE_${response.status}`);
+  if(!response.ok){
+    let detail='';
+    try { const body=await response.json(); detail=String(body?.message||body?.error||JSON.stringify(body)).replaceAll(key,'[REDACTED]').replace(/[^\p{L}\p{N} _.,:;()\[\]-]/gu,'').slice(0,120); } catch {}
+    throw new Error(`UPDATE_${response.status}${detail?`_${detail}`:''}`);
+  }
 }
 
 export async function applyBlackPlan(key, {beforeWrite, fetcher=fetch, pause=ms=>new Promise(resolve=>setTimeout(resolve,ms))}={}) {

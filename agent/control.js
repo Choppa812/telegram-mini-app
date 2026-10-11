@@ -32,7 +32,7 @@ export async function handleCommand(update, { ownerId, store, send, checkApi, ma
     else try {
       const result=await cleanBlack(batch,{beforeWrite:async()=>{if(await store.isPaused())throw new Error('AUTOMATION_PAUSED');}});
       await send(`Black — очистка ${batch}: ${result.details.join('; ')}. Осталось просмотреть ${result.remaining}.`);
-    } catch(error){await send(`Black — очистка прервана: ${String(error?.message||'ERROR').replace(/[^A-Z0-9_ .-]/g,'').slice(0,100)}. Проверьте /positions.`);}
+    } catch(error){await send(`Black — очистка прервана: ${String(error?.message||'ERROR').replace(/[^\p{L}\p{N}_ .,;:()\[\]-]/gu,'').slice(0,150)}. Проверьте /positions.`);}
   } else if (command === '/applyblack') {
     if (await store.isPaused()) await send('Автонастройка на паузе. Для изменения слотов сначала /resume.');
     else try {
@@ -40,7 +40,7 @@ export async function handleCommand(update, { ownerId, store, send, checkApi, ma
       const report={date:new Date().toISOString(),status:'completed',checked:result.checked,changed:result.changed,skipped:result.skipped,details:result.details};
       await store.saveReport(report);
       await send(`Black — настройка завершена. Изменено ${result.changed}, без изменений ${result.skipped}.\n${result.details.join('\n')}\nПроверено повторным чтением API.`);
-    } catch (error) { await send(`Black — настройка прервана: ${String(error?.message||'ERROR').replace(/[^A-Z0-9_ .-]/g,'').slice(0,100)}. Проверьте /positions Vice Cream и /positions Chill Flame.`); }
+    } catch (error) { await send(`Black — настройка прервана: ${String(error?.message||'ERROR').replace(/[^\p{L}\p{N}_ .,;:()\[\]-]/gu,'').slice(0,150)}. Проверьте /positions Vice Cream и /positions Chill Flame.`); }
   } else if (command === '/positions') {
     const filter=(m.text||'').trim().replace(/^\S+\s*/,'').trim();
     try { await send(await positionsOverview(filter)); }
