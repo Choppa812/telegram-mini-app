@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readMarketOverview, summarizeRecentOffers, marketOverviewText } from './market.js';
+import { readMarketOverview, summarizeRecentOffers, marketOverviewText, readFloorOverview, floorOverviewText } from './market.js';
 
 test('recent-offer overview excludes stale and malformed candidates without presenting them as floors', () => {
   const now = new Date('2026-10-11T15:00:00Z');
@@ -16,6 +16,25 @@ test('recent-offer overview excludes stale and malformed candidates without pres
   assert.equal(result.candidates[0].collection,'A');
   assert.equal(result.candidates[0].price,18);
   assert.match(marketOverviewText({ok:true,...result}),/не минимальные текущие цены/);
+});
+
+test('floor overview combines Portals and MRKT and keeps Black distinct', async()=>{
+  const calls=[];
+  const result=await readFloorOverview('secret',async(url,options)=>{
+    calls.push(String(url));
+    assert.equal(options.headers.Authorization,'Token secret');
+    const isBlack=String(url).includes('black=true');
+    const mrkt=String(url).includes('market=mrkt');
+    const data=isBlack?{A:mrkt?30:28,B:55}:{A:mrkt?20:19,B:22};
+    return {ok:true,status:200,json:async()=>data};
+  },async()=>{});
+  assert.equal(calls.length,4);
+  assert.equal(result.baseCount,2);
+  assert.equal(result.blackCount,2);
+  assert.equal(result.under50Black,1);
+  assert.deepEqual(result.candidates,[{collection:'A',base:19,black:28}]);
+  assert.match(floorOverviewText(result),/Black 28\.00, общий 19\.00/);
+  assert.ok(!JSON.stringify(result).includes('secret'));
 });
 
 test('overview uses the documented Token header and never exposes it in the result', async () => {

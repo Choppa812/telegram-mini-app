@@ -18,13 +18,16 @@ export function reportText(report) {
   ].filter(Boolean).join('\n');
 }
 
-export async function handleCommand(update, { ownerId, store, send, checkApi, marketOverview }) {
+export async function handleCommand(update, { ownerId, store, send, checkApi, marketOverview, floorOverview }) {
   const m = update?.message;
   if (!ownerId || m?.chat?.type !== 'private' || String(m?.from?.id) !== String(ownerId) || String(m?.chat?.id) !== String(ownerId)) return false;
   const command = (m.text || '').trim().split(/\s/)[0].split('@')[0].toLowerCase();
-  if (!['/start', '/help', '/status', '/report', '/pause', '/resume', '/checkapi', '/market'].includes(command)) return false;
+  if (!['/start', '/help', '/status', '/report', '/pause', '/resume', '/checkapi', '/market', '/floors'].includes(command)) return false;
   if (!Number.isSafeInteger(update.update_id)) return false;
-  if (command === '/market') {
+  if (command === '/floors') {
+    try { await send(await floorOverview()); }
+    catch { await send('Минимальные цены не удалось получить. Слоты не менялись.'); }
+  } else if (command === '/market') {
     try { await send(await marketOverview()); }
     catch { await send('Обзор рынка не завершён: ошибка соединения или ответа. Слоты не менялись.'); }
   } else if (command === '/checkapi') {

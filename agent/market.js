@@ -34,3 +34,30 @@ export function marketOverviewText(result) {
   const lines = result.candidates.map(row => `${row.collection}: ${f(row.price)} TON, ${row.market}, ${row.ageHours} ч назад`);
   return [`Gift Satellite — обзор последних офферов`, `Коллекций с ценами: ${result.priced}/${result.observed}; до 50 TON: ${result.under50}; свежих за сутки: ${result.fresh24h}.`, `Децили P10/P50/P90: ${f(result.p10)} / ${f(result.median)} / ${f(result.p90)} TON.`, ...lines, `Это последние офферы, а не минимальные текущие цены. Лимиты и покупки не менялись.`].join('\n');
 }
+
+export async function readFloorOverview(key, fetcher = fetch, pause = ms => new Promise(resolve => setTimeout(resolve, ms))) {
+  const datasets = {};
+  const statuses = {};
+  for (const market of ['portals', 'mrkt']) {
+    for (const type of ['base', 'black']) {
+      const result = await readSatellite('/history/floors', {market, ...(type === 'black' ? {black:true} : {})}, key, 'token', fetcher);
+      const name = `${market}_${type}`;
+      statuses[name] = result.status;
+      if (!result.ok || !result.data || typeof result.data !== 'object' || Array.isArray(result.data)) return {ok:false,statuses};
+      datasets[name] = result.data;
+      await pause(1050);
+    }
+  }
+  const names = new Set(Object.values(datasets).flatMap(data => Object.keys(data)));
+  const positive = value => Number.isFinite(Number(value)) && Number(value) > 0 ? Number(value) : null;
+  const min = (...values) => { const valid = values.map(positive).filter(value => value !== null); return valid.length ? Math.min(...valid) : null; };
+  const rows = [...names].map(collection => ({collection,base:min(datasets.portals_base[collection],datasets.mrkt_base[collection]),black:min(datasets.portals_black[collection],datasets.mrkt_black[collection])}));
+  const candidates = rows.filter(row => row.black !== null && row.black <= 50).sort((a,b)=>a.black-b.black).slice(0,30);
+  return {ok:true,statuses,baseCount:rows.filter(row=>row.base!==null).length,blackCount:rows.filter(row=>row.black!==null).length,under50Black:rows.filter(row=>row.black!==null&&row.black<=50).length,candidates};
+}
+
+export function floorOverviewText(result) {
+  if (!result?.ok) return `Минимальные цены недоступны: ${Object.entries(result?.statuses || {}).map(([market,status])=>`${market} HTTP ${status}`).join(', ')}. Слоты не менялись.`;
+  const lines = result.candidates.map(row=>`${row.collection}: Black ${row.black.toFixed(2)}, общий ${row.base?.toFixed(2) ?? '—'} TON`);
+  return [`Gift Satellite — минимальные цены Portals/MRKT`, `Коллекций: ${result.baseCount}; с Black: ${result.blackCount}; Black до 50 TON: ${result.under50Black}.`,...lines,'Это показания API, перед установкой лимита нужны проверка листингов и продаж. Слоты не менялись.'].join('\n');
+}
