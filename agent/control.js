@@ -18,13 +18,18 @@ export function reportText(report) {
   ].filter(Boolean).join('\n');
 }
 
-export async function handleCommand(update, { ownerId, store, send }) {
+export async function handleCommand(update, { ownerId, store, send, checkApi }) {
   const m = update?.message;
   if (!ownerId || m?.chat?.type !== 'private' || String(m?.from?.id) !== String(ownerId) || String(m?.chat?.id) !== String(ownerId)) return false;
   const command = (m.text || '').trim().split(/\s/)[0].split('@')[0].toLowerCase();
-  if (!['/start', '/help', '/status', '/report', '/pause', '/resume'].includes(command)) return false;
+  if (!['/start', '/help', '/status', '/report', '/pause', '/resume', '/checkapi'].includes(command)) return false;
   if (!Number.isSafeInteger(update.update_id)) return false;
-  if (command === '/pause' || command === '/resume') {
+  if (command === '/checkapi') {
+    try {
+      const result = await checkApi?.();
+      await send(result?.ok ? `API: чтение слотов доступно. Слотов: ${result.slots}. Изменения цен не выполнялись.` : `API: доступ не подтверждён. ${(result?.attempts || []).map(a=>`${a.mode}: HTTP ${a.status}`).join('; ')}. Проверены только запросы чтения, цены не менялись.`);
+    } catch { await send('Проверка API не завершена: ошибка соединения или ответа. Цены не менялись.'); }
+  } else if (command === '/pause' || command === '/resume') {
     const applied = await store.command(update.update_id, command === '/pause');
     const paused = await store.isPaused();
     await send(applied ? (paused ? STOP_NOTICE : 'Автонастройка разрешена. Следующая проверка — по ежедневному расписанию. Без подключённого API цены не изменяются.') : `Повторная или устаревшая команда пропущена. Автонастройка ${paused ? 'на паузе' : 'разрешена'}.`);

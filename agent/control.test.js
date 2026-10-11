@@ -28,6 +28,13 @@ test('only owner private messages may change control state', async () => {
   assert.equal(s.state.paused, true);
   assert.equal(s.messages.length, 0);
 });
+test('manual API check is owner-only, read-only, and does not resume paused automation', async () => {
+  const s=setup();let calls=0;
+  const deps={...s,checkApi:async()=>{calls++;return {ok:false,attempts:[{mode:'authorization',status:401}]};}};
+  await handleCommand(update(1,'/checkapi',7),deps);assert.equal(calls,0);
+  await handleCommand(update(2,'/checkapi'),deps);assert.equal(calls,1);
+  assert.equal(s.state.paused,true); assert.match(s.messages[0],/HTTP 401/);
+});
 test('pause persists in shared store; replayed resume cannot undo it', async () => {
   const s = setup();
   await handleCommand(update(1, '/resume'), s);
