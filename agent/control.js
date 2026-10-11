@@ -27,7 +27,7 @@ export async function handleCommand(update, { ownerId, store, send, checkApi }) 
   if (command === '/checkapi') {
     try {
       const result = await checkApi?.();
-      await send(result?.ok ? `API: чтение слотов доступно. Слотов: ${result.slots}. Изменения цен не выполнялись.` : `API: доступ не подтверждён. ${(result?.attempts || []).map(a=>`${a.mode}: HTTP ${a.status}`).join('; ')}. Проверены только запросы чтения, цены не менялись.`);
+      await send(result?.ok ? `API: чтение доступно. Слотов: ${result.slots}. Коллекций: ${result.collections?.count ?? 0} (HTTP ${result.collections?.status ?? '?'}). Офферов: ${result.offers?.count ?? 0} (HTTP ${result.offers?.status ?? '?'}). Изменения цен не выполнялись.` : `API: доступ не подтверждён. ${(result?.attempts || []).map(a=>`${a.mode}: HTTP ${a.status}`).join('; ')}. Проверены только запросы чтения, цены не менялись.`);
     } catch { await send('Проверка API не завершена: ошибка соединения или ответа. Цены не менялись.'); }
   } else if (command === '/pause' || command === '/resume') {
     const applied = await store.command(update.update_id, command === '/pause');
