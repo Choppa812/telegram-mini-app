@@ -9,6 +9,7 @@ export function reportText(report) {
     Number.isInteger(report.checked) ? `Проверено слотов: ${report.checked}` : null,
     Number.isInteger(report.changed) ? `Изменено лимитов: ${report.changed}` : null,
     Number.isInteger(report.skipped) ? `Пропущено: ${report.skipped}` : null,
+    Array.isArray(report.details) ? report.details.join('\n') : null,
     report.reason === 'api_authorization_failed' ? 'Gift Satellite отклонил постоянный API-ключ. Требуется документированный формат авторизации.' : null,
     report.reason === 'write_contract_unverified' ? 'Чтение API доступно; метод изменения лимитов ещё не проверен.' : null,
     report.status === 'blocked' ? 'Цены в реальном приложении не изменялись.' : null,
@@ -18,13 +19,21 @@ export function reportText(report) {
   ].filter(Boolean).join('\n');
 }
 
-export async function handleCommand(update, { ownerId, store, send, checkApi, marketOverview, floorOverview, inspectGift, feeOverview, turnoverOverview, blackDailySales, blackScan, positionsOverview, blackModels }) {
+export async function handleCommand(update, { ownerId, store, send, checkApi, marketOverview, floorOverview, inspectGift, feeOverview, turnoverOverview, blackDailySales, blackScan, positionsOverview, blackModels, applyBlack }) {
   const m = update?.message;
   if (!ownerId || m?.chat?.type !== 'private' || String(m?.from?.id) !== String(ownerId) || String(m?.chat?.id) !== String(ownerId)) return false;
   const command = (m.text || '').trim().split(/\s/)[0].split('@')[0].toLowerCase();
-  if (!['/start', '/help', '/status', '/report', '/pause', '/resume', '/checkapi', '/market', '/floors', '/inspect', '/fees', '/rank', '/blackday', '/blackscan', '/positions', '/models'].includes(command)) return false;
+  if (!['/start', '/help', '/status', '/report', '/pause', '/resume', '/checkapi', '/market', '/floors', '/inspect', '/fees', '/rank', '/blackday', '/blackscan', '/positions', '/models', '/applyblack'].includes(command)) return false;
   if (!Number.isSafeInteger(update.update_id)) return false;
-  if (command === '/positions') {
+  if (command === '/applyblack') {
+    if (await store.isPaused()) await send('Автонастройка на паузе. Для изменения слотов сначала /resume.');
+    else try {
+      const result=await applyBlack({ beforeWrite:async()=>{if(await store.isPaused())throw new Error('AUTOMATION_PAUSED');} });
+      const report={date:new Date().toISOString(),status:'completed',checked:result.checked,changed:result.changed,skipped:result.skipped,details:result.details};
+      await store.saveReport(report);
+      await send(`Black — настройка завершена. Изменено ${result.changed}, без изменений ${result.skipped}.\n${result.details.join('\n')}\nПроверено повторным чтением API.`);
+    } catch (error) { await send(`Black — настройка прервана: ${String(error?.message||'ERROR').replace(/[^A-Z0-9_ .-]/g,'').slice(0,100)}. Проверьте /positions Vice Cream и /positions Chill Flame.`); }
+  } else if (command === '/positions') {
     const filter=(m.text||'').trim().replace(/^\S+\s*/,'').trim();
     try { await send(await positionsOverview(filter)); }
     catch { await send('Текущие слоты не удалось прочитать.'); }
@@ -68,7 +77,7 @@ export async function handleCommand(update, { ownerId, store, send, checkApi, ma
   } else if (command === '/pause' || command === '/resume') {
     const applied = await store.command(update.update_id, command === '/pause');
     const paused = await store.isPaused();
-    await send(applied ? (paused ? STOP_NOTICE : 'Автонастройка разрешена. Следующая проверка — по ежедневному расписанию. Без подключённого API цены не изменяются.') : `Повторная или устаревшая команда пропущена. Автонастройка ${paused ? 'на паузе' : 'разрешена'}.`);
+    await send(applied ? (paused ? STOP_NOTICE : 'Автонастройка разрешена. Следующая проверка — по ежедневному расписанию или по сигналу VPS.') : `Повторная или устаревшая команда пропущена. Автонастройка ${paused ? 'на паузе' : 'разрешена'}.`);
   } else if (command === '/report') {
     await send(reportText(await store.getReport()));
   } else {
@@ -104,6 +113,7 @@ export async function dailyReport({ store, send, run, now = new Date() }) {
           if (!Number.isSafeInteger(result?.[key]) || result[key] < 0) throw new Error('INVALID_REPORT');
           report[key] = result[key];
         }
+        if (Array.isArray(result.details)) report.details = result.details.slice(0,10).map(String);
         report.status = result.status === 'blocked' ? 'blocked' : 'completed';
         if (['api_authorization_failed', 'write_contract_unverified'].includes(result.reason)) report.reason = result.reason;
       }

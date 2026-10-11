@@ -28,8 +28,3 @@ export async function probeSatellite(key, fetcher = fetch) {
   return { ok: true, mode, attempts, slots: result.data.length, inactiveSlots: result.data.filter(s=>s.portalsAutobuy === false).length, slotFields: Object.keys(result.data[0] || {}), slotSample: result.data.slice(0,3).map(s=>({ id:s._id, collection:s.collectionName, backgrounds:s.backdropNames, models:s.modelNames, autobuy:s.portalsAutobuy, limit:s.portalsAutobuyMaxPrice })), collections: { status:collections.status,count:Array.isArray(collections.data)?collections.data.length:0 }, offers: { status:offers.status,count:Array.isArray(offers.data)?offers.data.length:0 }, writesPerformed: 0 };
 }
 
-// Verification remains read-only while the pricing policy and live updates are prepared.
-export async function checkDailySatellite(key, fetcher = fetch) {
-  const result = await probeSatellite(key, fetcher);
-  return { status: 'blocked', reason: result.ok ? 'write_contract_unverified' : 'api_authorization_failed', checked: result.ok ? result.slots : 0, changed: 0, skipped: result.ok ? result.slots : 0 };
-}
