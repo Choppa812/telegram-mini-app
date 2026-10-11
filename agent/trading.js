@@ -74,18 +74,19 @@ export async function applyBlackPlan(key, {beforeWrite, fetcher=fetch, pause=ms=
   const [slotsResult,profileResult]=await Promise.all([readSatellite('/user/subscriptions',{},key,'token',fetcher),readSatellite('/user/me',{},key,'token',fetcher)]);
   if(!slotsResult.ok||!Array.isArray(slotsResult.data)||!profileResult.ok)throw new Error('ACCOUNT_READ_FAILED');
   const slots=slotsResult.data,profile=profileResult.data;
-  if(profile.isAutobuyEnabled!==true)throw new Error('GLOBAL_AUTOBUY_DISABLED');
   const available=Number(profile.tonBalance);
-  if(!Number.isFinite(available)||available<36)throw new Error('BALANCE_BELOW_PLAN');
+  if(!Number.isFinite(available)||available<0)throw new Error('INVALID_BALANCE');
+  if(profile.isAutobuyEnabled!==true)return {checked:BLACK_PLAN.length,changed:0,skipped:BLACK_PLAN.length,details:['Глобальная автопокупка выключена; лимиты не изменялись.']};
   for(const plan of BLACK_PLAN){
     result.checked++;
     const matches=slots.filter(s=>s.collectionName===plan.collection&&Array.isArray(s.backdropNames)&&s.backdropNames.length===1&&s.backdropNames[0]==='Black');
     if(matches.length!==1)throw new Error(`SLOT_NOT_UNIQUE_${plan.collection}`);
     const slot=matches[0];
-    if(slot.portalsAutobuy!==true||slot.portalsAutobuyQuantity!==1)throw new Error(`SLOT_NOT_READY_${plan.collection}`);
+    if(slot.portalsAutobuy!==true||slot.portalsAutobuyQuantity!==1){result.skipped++;result.details.push(`${plan.collection}: слот выключен или лимит покупок исчерпан`);continue;}
     const floor=await blackFloor(plan.collection,key,fetcher);
     const price=Math.floor(Math.min(plan.ceiling,floor-5)*100)/100;
     if(!Number.isFinite(price)||price<=0)throw new Error('INVALID_PRICE');
+    if(available<price*1.03){result.skipped++;result.details.push(`${plan.collection}: недостаточный баланс для лимита ${price.toFixed(2)} TON`);continue;}
     const samePrice=Math.abs(Number(slot.portalsAutobuyMaxPrice)-price)<0.001;
     const sameModels=JSON.stringify(slot.modelNames||[])===JSON.stringify(plan.models);
     if(samePrice&&sameModels){result.skipped++;result.details.push(`${plan.collection}: без изменений, ${price.toFixed(2)} TON, floor ${floor.toFixed(2)}`);continue;}

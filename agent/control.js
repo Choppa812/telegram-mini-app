@@ -2,7 +2,7 @@ export const STOP_NOTICE = 'Автонастройка и ежедневные �
 
 export function reportText(report) {
   if (!report) return 'Отчётов пока нет.';
-  const states = { paused: 'Автонастройка на паузе', disconnected: 'API Gift Satellite ещё не подключён', blocked: 'Настройка цен заблокирована', completed: 'Проверка завершена', error: 'Проверка не завершена' };
+  const states = { paused: 'Автонастройка на паузе', disconnected: 'API Gift Satellite ещё не подключён', blocked: 'Настройка цен заблокирована', completed: 'Настройка завершена', error: 'Проверка не завершена' };
   return [
     `Gift Satellite — ежедневный отчёт\n${report.date}`,
     states[report.status] || 'Неизвестный результат',

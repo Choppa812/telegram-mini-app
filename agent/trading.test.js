@@ -60,3 +60,19 @@ test('cleanup disables legacy autobuy without changing target collections',async
   assert.equal(state[0].portalsAutobuy,true);
   assert.equal(state[1].portalsAutobuy,true);
 });
+
+test('daily run skips a consumed slot after a purchase instead of failing',async()=>{
+  const state=structuredClone(slots);state[0].portalsAutobuyQuantity=0;
+  state[1].modelNames=['Signal Flare','Olympia','Ionic Column','Eternal Flame','Oil Lamp'];
+  state[1].portalsAutobuyMaxPrice=17.44;
+  const fetcher=async(url)=>{
+    const path=new URL(url).pathname;
+    if(path.endsWith('/user/subscriptions'))return reply(state);
+    if(path.endsWith('/user/me'))return reply({tonBalance:25.95,isAutobuyEnabled:true});
+    if(path.includes('/search/'))return reply([{backdropName:'Black',normalizedPrice:22.44,currency:'ton'}]);
+    throw new Error(path);
+  };
+  const result=await applyBlackPlan('test',{fetcher,beforeWrite:async()=>{throw new Error('unexpected write');},pause:async()=>{}});
+  assert.equal(result.changed,0);assert.equal(result.skipped,2);
+  assert.match(result.details[0],/исчерпан/);
+});
