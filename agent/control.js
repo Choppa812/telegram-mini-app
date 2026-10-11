@@ -18,13 +18,16 @@ export function reportText(report) {
   ].filter(Boolean).join('\n');
 }
 
-export async function handleCommand(update, { ownerId, store, send, checkApi }) {
+export async function handleCommand(update, { ownerId, store, send, checkApi, marketOverview }) {
   const m = update?.message;
   if (!ownerId || m?.chat?.type !== 'private' || String(m?.from?.id) !== String(ownerId) || String(m?.chat?.id) !== String(ownerId)) return false;
   const command = (m.text || '').trim().split(/\s/)[0].split('@')[0].toLowerCase();
-  if (!['/start', '/help', '/status', '/report', '/pause', '/resume', '/checkapi'].includes(command)) return false;
+  if (!['/start', '/help', '/status', '/report', '/pause', '/resume', '/checkapi', '/market'].includes(command)) return false;
   if (!Number.isSafeInteger(update.update_id)) return false;
-  if (command === '/checkapi') {
+  if (command === '/market') {
+    try { await send(await marketOverview()); }
+    catch { await send('Обзор рынка не завершён: ошибка соединения или ответа. Слоты не менялись.'); }
+  } else if (command === '/checkapi') {
     try {
       const result = await checkApi?.();
       await send(result?.ok ? `API: чтение доступно. Слотов: ${result.slots}. Коллекций: ${result.collections?.count ?? 0} (HTTP ${result.collections?.status ?? '?'}). Офферов: ${result.offers?.count ?? 0} (HTTP ${result.offers?.status ?? '?'}). Изменения цен не выполнялись.` : `API: доступ не подтверждён. ${(result?.attempts || []).map(a=>`${a.mode}: HTTP ${a.status}`).join('; ')}. Проверены только запросы чтения, цены не менялись.`);
@@ -36,7 +39,7 @@ export async function handleCommand(update, { ownerId, store, send, checkApi }) 
   } else if (command === '/report') {
     await send(reportText(await store.getReport()));
   } else {
-    await send(`Автонастройка: ${(await store.isPaused()) ? 'на паузе' : 'разрешена'}.\n${reportText(await store.getReport())}\n/pause — остановить изменение лимитов\n/resume — разрешить ежедневную настройку\n/report — последний отчёт`);
+    await send(`Автонастройка: ${(await store.isPaused()) ? 'на паузе' : 'разрешена'}.\n${reportText(await store.getReport())}\n/pause — остановить изменение лимитов\n/resume — разрешить ежедневную настройку\n/report — последний отчёт\n/market — обзор рынка без изменений`);
   }
   return true;
 }
