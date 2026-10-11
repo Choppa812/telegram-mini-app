@@ -36,14 +36,27 @@ test('pause persists in shared store; replayed resume cannot undo it', async () 
   assert.equal(s.state.paused, true);
   assert.ok(s.messages.includes(STOP_NOTICE));
 });
-test('daily cron sends paused report once and never calls provider', async () => {
+test('paused daily cron stays silent across days and never calls provider', async () => {
   const s = setup(); let calls = 0;
   const run = async () => { calls++; };
   await dailyReport({ ...s, run });
-  assert.deepEqual(await dailyReport({ ...s, run }), { duplicate: true });
+  assert.deepEqual(await dailyReport({ ...s, run, now: new Date('2026-10-12T06:00:00Z') }), { status:'paused', silent:true });
   assert.equal(calls, 0);
-  assert.equal(s.messages.length, 1);
-  assert.equal(s.state.report.status, 'paused');
+  assert.equal(s.messages.length, 0);
+  assert.equal(s.state.report, null);
+  assert.equal(s.state.done, false);
+});
+test('resume after a silent paused run allows the same day to execute', async () => {
+  const s=setup(); let calls=0;
+  const run=async()=>{calls++;return {checked:1,changed:0,skipped:1};};
+  await dailyReport({...s,run}); s.state.paused=false;
+  await dailyReport({...s,run}); assert.equal(calls,1); assert.equal(s.messages.length,1);
+});
+test('pause suppresses retry of a previously undelivered cached report', async () => {
+  const s=setup(); s.state.paused=false;
+  await assert.rejects(dailyReport({...s,run:async()=>({checked:1,changed:0,skipped:1}),send:async()=>{throw Error('offline');}}));
+  s.state.paused=true;
+  assert.equal((await dailyReport(s)).silent,true); assert.equal(s.messages.length,0);
 });
 test('unconnected API is reported truthfully without inventing successful changes', async () => {
   const s = setup(); s.state.paused = false;
@@ -68,6 +81,7 @@ test('pause during a run stops the next write', async () => {
   } });
   assert.equal(writes, 1);
   assert.equal(s.state.report.status, 'paused');
+  assert.equal(s.messages.length,1); // Only the explicit /pause confirmation.
 });
 test('provider failure never exposes credentials or pretends success', async () => {
   const s = setup(); s.state.paused = false;

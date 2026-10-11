@@ -1,4 +1,4 @@
-export const STOP_NOTICE = 'Автонастройка остановлена. Уже отправленный запрос может завершиться. Автопокупка в Gift Satellite продолжает работать по ранее установленным лимитам.';
+export const STOP_NOTICE = 'Автонастройка и ежедневные сообщения остановлены до /resume. Уже отправленный запрос может завершиться. Автопокупка в Gift Satellite продолжает работать по ранее установленным лимитам.';
 
 export function reportText(report) {
   if (!report) return 'Отчётов пока нет.';
@@ -38,12 +38,15 @@ export async function handleCommand(update, { ownerId, store, send }) {
 
 // Every provider write must call the pause guard immediately beforehand.
 export async function dailyReport({ store, send, run, now = new Date() }) {
+  // Paused cron invocations are silent and do not consume the day's run.
+  if (await store.isPaused()) return { status: 'paused', silent: true };
   const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Moscow', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
   const lease = await store.claimDay(day);
   if (!lease) return { duplicate: true };
   try {
     const cached = await store.getDayReport(day);
     if (cached) {
+      if (await store.isPaused()) return { status: 'paused', silent: true };
       await send(reportText(cached));
       await store.finishDay(day);
       return cached;
@@ -68,6 +71,7 @@ export async function dailyReport({ store, send, run, now = new Date() }) {
     }
     await store.saveReport(report);
     await store.saveDayReport(day, report);
+    if (await store.isPaused()) return { ...report, silent: true };
     await send(reportText(report));
     await store.finishDay(day);
     return report;
