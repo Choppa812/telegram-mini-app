@@ -10,9 +10,8 @@ async function request(path, token, {body, query, fetcher = fetch} = {}) {
 }
 
 function ask(data) {
-  if (!Array.isArray(data)) return null;
-  const prices = data.filter(item => !item?.currency || item.currency === 'ton').map(item => Number(item?.normalizedPrice)).filter(n => Number.isFinite(n) && n > 0);
-  return prices.length ? Math.min(...prices) : null;
+  if (!Array.isArray(data)) return [];
+  return data.filter(item => !item?.currency || item.currency === 'ton').map(item => Number(item?.normalizedPrice)).filter(n => Number.isFinite(n) && n > 0);
 }
 
 function sales(data, now) {
@@ -23,7 +22,7 @@ function sales(data, now) {
   });
   const prices = recent.map(item=>Number(item.normalizedPrice)).filter(n=>Number.isFinite(n)&&n>0).sort((a,b)=>a-b);
   const oldest = records.length ? Date.parse(records[records.length-1]?.soldAt || '') : null;
-  return {lastPage:records.length, sevenDays:recent.length, min:prices[0]??null, median:prices.length?prices[Math.floor((prices.length-1)/2)]:null, complete:records.length<20 || (Number.isFinite(oldest)&&oldest<now.getTime()-7*86400000)};
+  return {lastPage:records.length, sevenDays:recent.length, last24h:recent.filter(item=>Date.parse(item.soldAt)>=now.getTime()-86400000).length, min:prices[0]??null, p25:prices.length?prices[Math.floor((prices.length-1)*.25)]:null, median:prices.length?prices[Math.floor((prices.length-1)/2)]:null, complete:records.length<20 || (Number.isFinite(oldest)&&oldest<now.getTime()-7*86400000)};
 }
 
 export async function inspectCollection(collection, token, fetcher = fetch, now = new Date(), pause = ms => new Promise(resolve => setTimeout(resolve, ms))) {
@@ -37,16 +36,17 @@ export async function inspectCollection(collection, token, fetcher = fetch, now 
   const base=await batch(false);
   await pause(650);
   const black=await batch(true);
-  const section = results => ({floor:[ask(results[0].data),ask(results[1].data)].filter(x=>x!==null).reduce((a,b)=>Math.min(a,b),Infinity),sales:sales(results[2].data,now),statuses:results.map(item=>item.status)});
+  const section = results => {
+    const prices = [...ask(results[0].data),...ask(results[1].data)].sort((a,b)=>a-b);
+    return {floor:prices[0]??null,fifthAsk:prices[4]??null,sales:sales(results[2].data,now),statuses:results.map(item=>item.status)};
+  };
   const normal=section(base),dark=section(black);
-  if (!Number.isFinite(normal.floor)) normal.floor=null;
-  if (!Number.isFinite(dark.floor)) dark.floor=null;
   return {collection,normal,dark,checkedAt:now.toISOString(),writesPerformed:0};
 }
 
 export function inspectText(result) {
   const price=n=>n===null?'—':n.toFixed(2);
-  const line=(label,row)=>`${label}: предложение от ${price(row.floor)} TON; продажи за 7 дн. ${row.sales.sevenDays}${row.sales.complete?'':'+'}; медиана продаж ${price(row.sales.median)} TON; HTTP ${row.statuses.join('/')}`;
+  const line=(label,row)=>`${label}: предложение от ${price(row.floor)} TON; 5-е предложение ${price(row.fifthAsk)}; продажи 24ч ${row.sales.last24h}, 7д ${row.sales.sevenDays}${row.sales.complete?'':'+'}; нижний квартиль/медиана продаж ${price(row.sales.p25)}/${price(row.sales.median)} TON; HTTP ${row.statuses.join('/')}`;
   const cap=row=>row.floor===null?'—':price(Math.max(0,row.floor-5));
   return [`Gift Satellite — ${result.collection}`,line('Все фоны',result.normal),line('Black',result.dark),`Верхняя граница покупки по правилу «минус 5 TON»: ${cap(result.normal)} / Black ${cap(result.dark)} TON.`, 'Расчёт предварительный: не учтены комиссии, ликвидность моделей и других площадок. Слоты не менялись.'].join('\n');
 }
