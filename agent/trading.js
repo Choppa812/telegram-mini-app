@@ -9,6 +9,7 @@ export const BLACK_PLAN = [
 function subscriptionBody(slot, plan, price) {
   const keys = ['subscriptionName','collectionName','numberPattern','portalsNotifyMaxPrice','notifyTg','notifyPortals','notifyTonnel','notifyMrkt','notifyGetgems','portalsAutobuy','portalsAutobuyQuantity','autobuyTg','autobuyPortals','autobuyTonnel','autobuyMrkt','forwardToChat','forwardToTopic'];
   const body = Object.fromEntries(keys.filter(key => slot[key] !== undefined).map(key => [key,slot[key]]));
+  if(body.numberPattern==='')body.numberPattern=null;
   return { ...body, modelNames:plan.models, backdropNames:['Black'], symbolNames:slot.symbolNames||[], portalsAutobuyMaxPrice:price };
 }
 

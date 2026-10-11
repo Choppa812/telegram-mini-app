@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { applyBlackPlan,cleanBlackBatch } from './trading.js';
 
 const slots=[
-  {_id:'aaaaaaaaaaaaaaaaaaaaaaaa',subscriptionName:'Vice',collectionName:'Vice Cream',modelNames:[],backdropNames:['Black'],portalsAutobuy:true,portalsAutobuyMaxPrice:13,portalsAutobuyQuantity:1,autobuyTg:true,autobuyPortals:true,autobuyTonnel:true,autobuyMrkt:true},
+  {_id:'aaaaaaaaaaaaaaaaaaaaaaaa',subscriptionName:'Vice',collectionName:'Vice Cream',modelNames:[],backdropNames:['Black'],numberPattern:'',portalsAutobuy:true,portalsAutobuyMaxPrice:13,portalsAutobuyQuantity:1,autobuyTg:true,autobuyPortals:true,autobuyTonnel:true,autobuyMrkt:true},
   {_id:'bbbbbbbbbbbbbbbbbbbbbbbb',subscriptionName:'Chill',collectionName:'Chill Flame',modelNames:[],backdropNames:['Black'],portalsAutobuy:true,portalsAutobuyMaxPrice:12,portalsAutobuyQuantity:1,autobuyTg:true,autobuyPortals:true,autobuyTonnel:true,autobuyMrkt:true},
 ];
 const reply=(data,status=200)=>({ok:status===200,status,json:async()=>data});
@@ -29,6 +29,7 @@ test('updates existing Black slots at least five TON below live floor and verifi
   assert.deepEqual(writes.map(x=>x.backdropNames),[['Black'],['Black']]);
   assert.deepEqual(writes.map(x=>x.modelNames.length),[6,5]);
   assert.deepEqual(writes.map(x=>x.symbolNames),[[],[]]);
+  assert.equal(writes[0].numberPattern,null);
 });
 
 test('pause guard blocks writes',async()=>{
