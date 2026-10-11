@@ -9,7 +9,7 @@ export const BLACK_PLAN = [
 function subscriptionBody(slot, plan, price) {
   const keys = ['subscriptionName','collectionName','numberPattern','portalsNotifyMaxPrice','notifyTg','notifyPortals','notifyTonnel','notifyMrkt','notifyGetgems','portalsAutobuy','portalsAutobuyQuantity','autobuyTg','autobuyPortals','autobuyTonnel','autobuyMrkt','forwardToChat','forwardToTopic'];
   const body = Object.fromEntries(keys.filter(key => slot[key] !== undefined).map(key => [key,slot[key]]));
-  return { ...body, modelNames:plan.models, backdropNames:['Black'], portalsAutobuyMaxPrice:price };
+  return { ...body, modelNames:plan.models, backdropNames:['Black'], symbolNames:slot.symbolNames||[], portalsAutobuyMaxPrice:price };
 }
 
 export async function cleanBlackBatch(key, batch, {beforeWrite,fetcher=fetch,pause=ms=>new Promise(resolve=>setTimeout(resolve,ms))}={}) {
