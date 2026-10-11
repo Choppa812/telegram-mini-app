@@ -2,7 +2,7 @@ const BASE = 'https://gift-satellite.dev/api';
 const MODES = ['token'];
 
 export async function readSatellite(path, params, key, mode, fetcher = fetch) {
-  if (!['/user/subscriptions', '/gift/collections', '/history/collection-offers', '/history/floors'].includes(path)) throw new Error('UNSUPPORTED_READ_PATH');
+  if (!['/user/subscriptions', '/user/me', '/user/purchases', '/gift/collections', '/history/collection-offers', '/history/floors'].includes(path)) throw new Error('UNSUPPORTED_READ_PATH');
   if (!key || !MODES.includes(mode)) throw new Error('SATELLITE_CONFIGURATION_MISSING');
   const url = new URL(BASE + path);
   for (const [name, value] of Object.entries(params || {})) url.searchParams.set(name, String(value));

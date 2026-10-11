@@ -18,13 +18,16 @@ export function reportText(report) {
   ].filter(Boolean).join('\n');
 }
 
-export async function handleCommand(update, { ownerId, store, send, checkApi, marketOverview, floorOverview, inspectGift }) {
+export async function handleCommand(update, { ownerId, store, send, checkApi, marketOverview, floorOverview, inspectGift, feeOverview }) {
   const m = update?.message;
   if (!ownerId || m?.chat?.type !== 'private' || String(m?.from?.id) !== String(ownerId) || String(m?.chat?.id) !== String(ownerId)) return false;
   const command = (m.text || '').trim().split(/\s/)[0].split('@')[0].toLowerCase();
-  if (!['/start', '/help', '/status', '/report', '/pause', '/resume', '/checkapi', '/market', '/floors', '/inspect'].includes(command)) return false;
+  if (!['/start', '/help', '/status', '/report', '/pause', '/resume', '/checkapi', '/market', '/floors', '/inspect', '/fees'].includes(command)) return false;
   if (!Number.isSafeInteger(update.update_id)) return false;
-  if (command === '/inspect') {
+  if (command === '/fees') {
+    try { await send(await feeOverview()); }
+    catch { await send('Комиссии не удалось проверить. Слоты не менялись.'); }
+  } else if (command === '/inspect') {
     const collection = (m.text || '').trim().replace(/^\S+\s*/, '').trim();
     if (!collection) await send('Укажите коллекцию после команды: /inspect B-Day Candle');
     else try { await send(await inspectGift(collection)); }
