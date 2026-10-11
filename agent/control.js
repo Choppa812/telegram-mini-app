@@ -18,13 +18,18 @@ export function reportText(report) {
   ].filter(Boolean).join('\n');
 }
 
-export async function handleCommand(update, { ownerId, store, send, checkApi, marketOverview, floorOverview, inspectGift, feeOverview, turnoverOverview }) {
+export async function handleCommand(update, { ownerId, store, send, checkApi, marketOverview, floorOverview, inspectGift, feeOverview, turnoverOverview, blackDailySales }) {
   const m = update?.message;
   if (!ownerId || m?.chat?.type !== 'private' || String(m?.from?.id) !== String(ownerId) || String(m?.chat?.id) !== String(ownerId)) return false;
   const command = (m.text || '').trim().split(/\s/)[0].split('@')[0].toLowerCase();
-  if (!['/start', '/help', '/status', '/report', '/pause', '/resume', '/checkapi', '/market', '/floors', '/inspect', '/fees', '/rank'].includes(command)) return false;
+  if (!['/start', '/help', '/status', '/report', '/pause', '/resume', '/checkapi', '/market', '/floors', '/inspect', '/fees', '/rank', '/blackday'].includes(command)) return false;
   if (!Number.isSafeInteger(update.update_id)) return false;
-  if (command === '/rank') {
+  if (command === '/blackday') {
+    const collection = (m.text || '').trim().replace(/^\S+\s*/, '').trim();
+    if (!collection) await send('Укажите коллекцию: /blackday Vice Cream');
+    else try { await send(await blackDailySales(collection)); }
+    catch { await send('Продажи Black не удалось проверить. Слоты не менялись.'); }
+  } else if (command === '/rank') {
     try { await send(await turnoverOverview()); }
     catch { await send('Частоту продаж не удалось проверить. Слоты не менялись.'); }
   } else if (command === '/fees') {
