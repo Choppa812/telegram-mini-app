@@ -29,7 +29,7 @@ test('updates existing Black slots at least five TON below live floor and verifi
   assert.deepEqual(writes.map(x=>x.backdropNames),[['Black'],['Black']]);
   assert.deepEqual(writes.map(x=>x.modelNames.length),[6,5]);
   assert.deepEqual(writes.map(x=>x.symbolNames),[[],[]]);
-  assert.equal(writes[0].numberPattern,null);
+  assert.equal('numberPattern' in writes[0],false);
 });
 
 test('pause guard blocks writes',async()=>{
