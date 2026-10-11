@@ -18,13 +18,21 @@ export function reportText(report) {
   ].filter(Boolean).join('\n');
 }
 
-export async function handleCommand(update, { ownerId, store, send, checkApi, marketOverview, floorOverview, inspectGift, feeOverview, turnoverOverview, blackDailySales, blackScan }) {
+export async function handleCommand(update, { ownerId, store, send, checkApi, marketOverview, floorOverview, inspectGift, feeOverview, turnoverOverview, blackDailySales, blackScan, positionsOverview, blackModels }) {
   const m = update?.message;
   if (!ownerId || m?.chat?.type !== 'private' || String(m?.from?.id) !== String(ownerId) || String(m?.chat?.id) !== String(ownerId)) return false;
   const command = (m.text || '').trim().split(/\s/)[0].split('@')[0].toLowerCase();
-  if (!['/start', '/help', '/status', '/report', '/pause', '/resume', '/checkapi', '/market', '/floors', '/inspect', '/fees', '/rank', '/blackday', '/blackscan'].includes(command)) return false;
+  if (!['/start', '/help', '/status', '/report', '/pause', '/resume', '/checkapi', '/market', '/floors', '/inspect', '/fees', '/rank', '/blackday', '/blackscan', '/positions', '/models'].includes(command)) return false;
   if (!Number.isSafeInteger(update.update_id)) return false;
-  if (command === '/blackscan') {
+  if (command === '/positions') {
+    try { await send(await positionsOverview()); }
+    catch { await send('Текущие слоты не удалось прочитать.'); }
+  } else if (command === '/models') {
+    const collection=(m.text||'').trim().replace(/^\S+\s*/,'').trim();
+    if(!collection)await send('Укажите коллекцию: /models Vice Cream');
+    else try { await send(await blackModels(collection)); }
+    catch { await send('Модели Black не удалось проверить. Слоты не менялись.'); }
+  } else if (command === '/blackscan') {
     const index = Number((m.text || '').trim().replace(/^\S+\s*/, '').trim());
     if (!Number.isInteger(index) || index < 0 || index > 30) await send('Укажите номер пакета от 0: /blackscan 0');
     else try { await send(await blackScan(index)); }
