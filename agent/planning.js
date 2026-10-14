@@ -17,7 +17,7 @@ export function positionsText(result, filter='') {
 
 export async function readBlackModels(collection,key,fetcher=fetch,now=new Date(),pause=ms=>new Promise(resolve=>setTimeout(resolve,ms))) {
   if(typeof collection!=='string'||!/^[\p{L}\p{N} .'-]{2,80}$/u.test(collection)||!key)throw new Error('INVALID_MODELS_REQUEST');
-  const cutoff=now.getTime()-86400000, byModel=new Map();
+  const cutoff=now.getTime()-86400000, byModel=new Map(), markets={};
   let total=0,complete=false,pages=0;
   for(let page=0;page<12;page++){
     if(page)await pause(650);
@@ -31,18 +31,25 @@ export async function readBlackModels(collection,key,fetcher=fetch,now=new Date(
     for(let i=0;i<data.content.length;i++){
       if(times[i]<cutoff||times[i]>now.getTime())continue;
       const row=data.content[i],model=row.modelName||'(без модели)',price=Number(row.normalizedPrice);
-      if(!byModel.has(model))byModel.set(model,[]);
-      byModel.get(model).push(price);
+      if(!byModel.has(model))byModel.set(model,{prices:[],markets:{}});
+      const record=byModel.get(model);record.prices.push(price);
+      if(typeof row.market==='string'&&row.market){record.markets[row.market]=(record.markets[row.market]||0)+1;markets[row.market]=(markets[row.market]||0)+1;}
       total++;
     }
     if(data.content.length<20||!times.length||times[times.length-1]<cutoff){complete=true;break;}
   }
-  const rows=[...byModel].map(([model,prices])=>{const sorted=prices.filter(x=>Number.isFinite(x)&&x>0).sort((a,b)=>a-b);return {model,count:prices.length,p25:sorted.length?sorted[Math.floor((sorted.length-1)*.25)]:null,median:sorted.length?sorted[Math.floor((sorted.length-1)/2)]:null};}).sort((a,b)=>b.count-a.count);
-  return {ok:true,collection,total,complete,pages,rows,writesPerformed:0};
+  const rows=[...byModel].map(([model,record])=>{const sorted=record.prices.filter(x=>Number.isFinite(x)&&x>0).sort((a,b)=>a-b);return {model,count:record.prices.length,p25:sorted.length?sorted[Math.floor((sorted.length-1)*.25)]:null,median:sorted.length?sorted[Math.floor((sorted.length-1)/2)]:null,markets:record.markets};}).sort((a,b)=>b.count-a.count);
+  return {ok:true,collection,total,complete,pages,rows,markets,writesPerformed:0};
 }
 
 export function blackModelsText(result){
   if(!result?.ok)return `Модели Black недоступны: HTTP ${result?.status??'?'}.`;
   const f=n=>Number.isFinite(n)?n.toFixed(2):'—';
   return [`Gift Satellite — модели ${result.collection} Black: ${result.total}${result.complete?'':'+'} продаж за 24 ч, ${result.pages} стр.`,...result.rows.slice(0,30).map(r=>`${r.model}: ${r.count} сделок, Q1/медиана ${f(r.p25)}/${f(r.median)} TON`),'Исторические цены не гарантируют перепродажу. Слоты не менялись.'].join('\n');
+}
+
+export function modelMarketsText(result){
+  if(!result?.ok)return `Продажи Black по площадкам недоступны: HTTP ${result?.status??'?'}. Слоты не менялись.`;
+  const parts=markets=>Object.entries(markets||{}).sort((a,b)=>b[1]-a[1]).map(([market,count])=>`${market} ${count}`).join(', ')||'площадка не указана';
+  return [`Gift Satellite — продажи ${result.collection} Black по площадкам за 24 ч: ${result.total}${result.complete?'':'+'}.`, `Всего: ${parts(result.markets)}.`, ...result.rows.slice(0,8).map(row=>`${row.model}: ${row.count}, ${parts(row.markets)}`), 'Слоты не менялись.'].join('\n');
 }

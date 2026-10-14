@@ -1,17 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readPositions,positionsText,readBlackModels,blackModelsText} from './planning.js';
+import {readPositions,positionsText,readBlackModels,blackModelsText,modelMarketsText} from './planning.js';
 
 test('model analysis counts Black sales and groups by model',async()=>{
   const fetcher=async(url,options)=>{
     assert.match(String(url),/\/history\/Vice%20Cream$/);
     assert.equal(options.headers.Authorization,'Token secret');
     assert.deepEqual(JSON.parse(options.body).backdrops,['Black']);
-    return {ok:true,status:200,json:async()=>({content:[{soldAt:'2026-10-11T15:00:00Z',modelName:'A',normalizedPrice:20},{soldAt:'2026-10-11T14:00:00Z',modelName:'A',normalizedPrice:22},{soldAt:'2026-10-11T13:00:00Z',modelName:'B',normalizedPrice:19}]})};
+    return {ok:true,status:200,json:async()=>({content:[{soldAt:'2026-10-11T15:00:00Z',modelName:'A',normalizedPrice:20,market:'portals'},{soldAt:'2026-10-11T14:00:00Z',modelName:'A',normalizedPrice:22,market:'mrkt'},{soldAt:'2026-10-11T13:00:00Z',modelName:'B',normalizedPrice:19,market:'portals'}]})};
   };
   const result=await readBlackModels('Vice Cream','secret',fetcher,new Date('2026-10-11T16:00:00Z'));
   assert.equal(result.total,3);assert.deepEqual(result.rows.map(r=>[r.model,r.count]),[['A',2],['B',1]]);
   assert.match(blackModelsText(result),/модели Vice Cream Black/);
+  assert.deepEqual(result.markets,{portals:2,mrkt:1});
+  assert.match(modelMarketsText(result),/A: 2, portals 1, mrkt 1/);
   assert.ok(!JSON.stringify(result).includes('secret'));
 });
 
