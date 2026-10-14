@@ -19,11 +19,11 @@ export function reportText(report) {
   ].filter(Boolean).join('\n');
 }
 
-export async function handleCommand(update, { ownerId, store, send, checkApi, marketOverview, floorOverview, inspectGift, feeOverview, turnoverOverview, blackDailySales, blackScan, positionsOverview, blackModels, applyBlack, cleanBlack }) {
+export async function handleCommand(update, { ownerId, store, send, checkApi, marketOverview, floorOverview, inspectGift, feeOverview, turnoverOverview, blackDailySales, blackScan, positionsOverview, blackModels, crossMarket, applyBlack, cleanBlack }) {
   const m = update?.message;
   if (!ownerId || m?.chat?.type !== 'private' || String(m?.from?.id) !== String(ownerId) || String(m?.chat?.id) !== String(ownerId)) return false;
   const command = (m.text || '').trim().split(/\s/)[0].split('@')[0].toLowerCase();
-  if (!['/start', '/help', '/status', '/report', '/pause', '/resume', '/checkapi', '/market', '/floors', '/inspect', '/fees', '/rank', '/blackday', '/blackscan', '/positions', '/models', '/applyblack', '/blackclean'].includes(command)) return false;
+  if (!['/start', '/help', '/status', '/report', '/pause', '/resume', '/checkapi', '/market', '/floors', '/inspect', '/fees', '/rank', '/blackday', '/blackscan', '/positions', '/models', '/cross', '/applyblack', '/blackclean'].includes(command)) return false;
   if (!Number.isSafeInteger(update.update_id)) return false;
   if (command === '/blackclean') {
     const batch=Number((m.text||'').trim().replace(/^\S+\s*/,'').trim());
@@ -50,6 +50,11 @@ export async function handleCommand(update, { ownerId, store, send, checkApi, ma
     if(!collection)await send('Укажите коллекцию: /models Vice Cream');
     else try { await send(await blackModels(collection)); }
     catch { await send('Модели Black не удалось проверить. Слоты не менялись.'); }
+  } else if (command === '/cross') {
+    const [collection, modelText = ''] = (m.text || '').trim().replace(/^\S+\s*/, '').split('|');
+    if (!collection?.trim()) await send('Укажите коллекцию: /cross Vice Cream | Birthday,Sushi');
+    else try { await send(await crossMarket(collection.trim(), modelText.split(',').map(x => x.trim()).filter(Boolean))); }
+    catch { await send('Цены Black по площадкам не удалось проверить. Слоты не менялись.'); }
   } else if (command === '/blackscan') {
     const index = Number((m.text || '').trim().replace(/^\S+\s*/, '').trim());
     if (!Number.isInteger(index) || index < 0 || index > 30) await send('Укажите номер пакета от 0: /blackscan 0');
