@@ -3,7 +3,7 @@ import { runtime, sameSecret } from '../runtime.js';
 import { applyBlackPlan } from '../trading.js';
 
 // Short-lived, single-use activation for the owner's approved five-gift plan.
-const TOKEN_HASH = '6a32ace16c8ca0990c50d1c6e06c6d7bca854f3f2aa40b6adde5721ff9ff6887';
+const TOKEN_HASH = 'b54c8bebdb71f58859e4113253dd0388c66c8bf1746da5364c1a0c5c2980cbe9';
 const OPERATION = 'approved-black-five-2026-10-14';
 
 export default async function handler(req, res) {
