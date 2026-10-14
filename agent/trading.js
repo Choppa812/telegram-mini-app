@@ -3,11 +3,13 @@ import { readBlackModels } from './planning.js';
 
 const BASE = 'https://gift-satellite.dev/api';
 export const BLACK_PLAN = [
-  { collection: 'Vice Cream', models: ['Birthday', 'Sushi', 'Bamboo Ice', 'Pine Cone', 'Cavendish', 'Vanilla'], ceiling: 15.79, minModelSales:4, maxModels:6 },
-  { collection: 'Chill Flame', models: ['Signal Flare', 'Olympia', 'Ionic Column', 'Eternal Flame', 'Oil Lamp'], ceiling: 17.44, minModelSales:2, maxModels:5 },
-  { collection: 'Xmas Stocking', sourceCollection: 'Lol Pop', models: ['Vintage', 'Hot Winter', 'Fairy Tale', 'Lime Treats'], ceiling: 15.27, minModelSales:2, maxModels:4 },
+  { collection: 'Vice Cream', models: ['Bamboo Ice', 'Birthday', 'Cherry On Top', 'Iceman', 'Mermaid', 'Dreamland'], ceiling: 15.34, minModelSales:2, maxModels:6 },
+  { collection: 'Chill Flame', models: ['Dungeon', 'Tribal Totem', 'Dark Relic', 'Druid Flame', 'Birthday Cake'], ceiling: 17.13, minModelSales:2, maxModels:5 },
+  { collection: 'Xmas Stocking', models: ['Frozen Moss', 'Toffee', 'Cherry', 'Poison Ivy'], ceiling: 15.94, minModelSales:2, maxModels:4 },
+  { collection: 'B-Day Candle', sourceCollection: 'Record Player', models: ['Be Awesome!', 'Fresh Mint', 'Best Wishes'], ceiling: 15.81, minModelSales:2, maxModels:3 },
+  { collection: 'Whip Cupcake', sourceCollection: 'Jelly Bunny', models: ['Cream Scream', 'Sponge Duck', 'Trippy', 'High Five', 'Triple Treat'], ceiling: 16.46, minModelSales:2, maxModels:5 },
 ];
-if(BLACK_PLAN.reduce((sum,plan)=>sum+plan.ceiling,0)*1.03>50)throw new Error('BLACK_PLAN_OVER_BUDGET');
+if(BLACK_PLAN.reduce((sum,plan)=>sum+plan.ceiling,0)*1.03>87.23)throw new Error('BLACK_PLAN_OVER_BUDGET');
 
 function subscriptionBody(slot, plan, price) {
   const keys = ['subscriptionName','collectionName','numberPattern','portalsNotifyMaxPrice','notifyTg','notifyPortals','notifyTonnel','notifyMrkt','notifyGetgems','portalsAutobuy','portalsAutobuyQuantity','autobuyTg','autobuyPortals','autobuyTonnel','autobuyMrkt','forwardToChat','forwardToTopic'];
@@ -80,6 +82,12 @@ export async function applyBlackPlan(key, {beforeWrite, fetcher=fetch, pause=ms=
   const available=Number(profile.tonBalance);
   if(!Number.isFinite(available)||available<0)throw new Error('INVALID_BALANCE');
   if(profile.isAutobuyEnabled!==true)return {checked:BLACK_PLAN.length,changed:0,skipped:BLACK_PLAN.length,details:['Глобальная автопокупка выключена; лимиты не изменялись.']};
+  const plannedNames=new Set(BLACK_PLAN.map(plan=>plan.collection));
+  const otherExposure=slots.filter(slot=>slot.portalsAutobuy===true&&!plannedNames.has(slot.collectionName))
+    .reduce((sum,slot)=>sum+Number(slot.portalsAutobuyMaxPrice||0)*Number(slot.portalsAutobuyQuantity||0),0);
+  const maximumExposure=(otherExposure+BLACK_PLAN.reduce((sum,plan)=>sum+plan.ceiling,0))*1.03;
+  if(!Number.isFinite(maximumExposure)||maximumExposure>available+0.0001)
+    return {checked:BLACK_PLAN.length,changed:0,skipped:BLACK_PLAN.length,details:[`Баланс ${available.toFixed(2)} TON недостаточен для пяти лимитов с резервом комиссии (${maximumExposure.toFixed(2)} TON); слоты не менялись.`]};
   for(const plan of BLACK_PLAN){
     result.checked++;
     const matches=slots.filter(s=>s.collectionName===plan.collection&&Array.isArray(s.backdropNames)&&s.backdropNames.length===1&&s.backdropNames[0]==='Black');
@@ -90,16 +98,19 @@ export async function applyBlackPlan(key, {beforeWrite, fetcher=fetch, pause=ms=
     const activation=source.length===1;
     if(!activation&&(slot.portalsAutobuy!==true||slot.portalsAutobuyQuantity!==1)){result.skipped++;result.details.push(`${plan.collection}: слот выключен или лимит покупок исчерпан`);continue;}
     const floor=await blackFloor(plan.collection,key,fetcher);
-    const price=Math.floor(Math.min(plan.ceiling,floor-5)*100)/100;
-    if(!Number.isFinite(price)||price<=0)throw new Error('INVALID_PRICE');
-    if(available<price*1.03){result.skipped++;result.details.push(`${plan.collection}: недостаточный баланс для лимита ${price.toFixed(2)} TON`);continue;}
     const history=await modelReader(plan.collection,key,fetcher,new Date(),pause);
     const candidates=history?.ok&&history.complete&&history.total>=20
-      ?history.rows.filter(row=>row.count>=plan.minModelSales&&Number.isFinite(row.p25)&&row.p25>=price*1.03+2)
+      ?history.rows.filter(row=>plan.models.includes(row.model)&&row.count>=plan.minModelSales&&Number.isFinite(row.p25)&&row.p25>0)
         .sort((a,b)=>b.count-a.count||b.p25-a.p25||a.model.localeCompare(b.model,'en'))
-        .slice(0,plan.maxModels).map(row=>row.model)
+        .slice(0,plan.maxModels)
       :[];
-    const models=candidates.length?candidates:(!activation&&slot.modelNames?.length?slot.modelNames:plan.models);
+    if(!candidates.length){result.skipped++;result.details.push(`${plan.collection}: недостаточно проверенных продаж моделей Black`);continue;}
+    const modelLimit=Math.floor(((Math.min(...candidates.map(row=>row.p25))*0.95-3)/1.03)*100)/100;
+    const price=Math.floor(Math.min(plan.ceiling,modelLimit,floor-2)*100)/100;
+    if(!Number.isFinite(price)||price<=0)throw new Error('INVALID_PRICE');
+    if(available<price*1.03){result.skipped++;result.details.push(`${plan.collection}: недостаточный баланс для лимита ${price.toFixed(2)} TON`);continue;}
+    const models=candidates.filter(row=>row.p25*0.95-price*1.03>=3).map(row=>row.model);
+    if(!models.length){result.skipped++;result.details.push(`${plan.collection}: нет моделей с достаточным запасом после расходов`);continue;}
     const samePrice=Math.abs(Number(slot.portalsAutobuyMaxPrice)-price)<0.001;
     const sameModels=JSON.stringify(slot.modelNames||[])===JSON.stringify(models);
     if(!activation&&samePrice&&sameModels){result.skipped++;result.details.push(`${plan.collection}: без изменений, ${price.toFixed(2)} TON, floor ${floor.toFixed(2)}`);continue;}
