@@ -18,3 +18,12 @@ test('scans only affordable Black collections and marks page-limited counts', as
   assert.match(blackScanText(result),/20\+/);
   assert.ok(!JSON.stringify(result).includes('secret'));
 });
+
+test('larger balance scan includes Black floors up to 90 TON', async () => {
+  const fetcher=async url=>String(url).includes('/history/floors')
+    ? {ok:true,status:200,json:async()=>({A:30,B:80,C:95})}
+    : {ok:true,status:200,json:async()=>({content:[]})};
+  const result=await scanBlackBatch(0,'secret',fetcher,new Date('2026-10-11T16:00:00Z'),async()=>{},90);
+  assert.equal(result.total,2);
+  assert.match(blackScanText(result),/до 90 TON/);
+});

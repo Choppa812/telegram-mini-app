@@ -23,7 +23,7 @@ export async function handleCommand(update, { ownerId, store, send, checkApi, ma
   const m = update?.message;
   if (!ownerId || m?.chat?.type !== 'private' || String(m?.from?.id) !== String(ownerId) || String(m?.chat?.id) !== String(ownerId)) return false;
   const command = (m.text || '').trim().split(/\s/)[0].split('@')[0].toLowerCase();
-  if (!['/start', '/help', '/status', '/report', '/pause', '/resume', '/checkapi', '/market', '/floors', '/inspect', '/fees', '/rank', '/blackday', '/blackscan', '/positions', '/models', '/marketsales', '/cross', '/applyblack', '/blackclean'].includes(command)) return false;
+  if (!['/start', '/help', '/status', '/report', '/pause', '/resume', '/checkapi', '/market', '/floors', '/inspect', '/fees', '/rank', '/blackday', '/blackscan', '/blackscan90', '/positions', '/models', '/marketsales', '/cross', '/applyblack', '/blackclean'].includes(command)) return false;
   if (!Number.isSafeInteger(update.update_id)) return false;
   if (command === '/blackclean') {
     const batch=Number((m.text||'').trim().replace(/^\S+\s*/,'').trim());
@@ -60,10 +60,10 @@ export async function handleCommand(update, { ownerId, store, send, checkApi, ma
     if(!collection)await send('Укажите коллекцию: /marketsales Vice Cream');
     else try { await send(await modelMarkets(collection)); }
     catch { await send('Продажи Black по площадкам не удалось проверить. Слоты не менялись.'); }
-  } else if (command === '/blackscan') {
+  } else if (command === '/blackscan' || command === '/blackscan90') {
     const index = Number((m.text || '').trim().replace(/^\S+\s*/, '').trim());
     if (!Number.isInteger(index) || index < 0 || index > 30) await send('Укажите номер пакета от 0: /blackscan 0');
-    else try { await send(await blackScan(index)); }
+    else try { await send(await blackScan(index, command === '/blackscan90' ? 90 : 50)); }
     catch { await send('Сканирование Black не удалось завершить. Слоты не менялись.'); }
   } else if (command === '/blackday') {
     const collection = (m.text || '').trim().replace(/^\S+\s*/, '').trim();
