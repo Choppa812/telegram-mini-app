@@ -9,6 +9,7 @@ export const BLACK_PLAN = [
   { collection: 'B-Day Candle', sourceCollection: 'Record Player', models: ['Be Awesome!', 'Fresh Mint', 'Best Wishes'], ceiling: 15.81, minModelSales:2, maxModels:3 },
   { collection: 'Lol Pop', sourceCollection: 'Snoop Dogg', models: ['Cosmic Green', 'Spectrum', 'Old Liqueur', 'Holidaze'], ceiling: 20.00, minModelSales:3, maxModels:4 },
   { collection: 'Instant Ramen', models: ['Chicken', 'Sunny Loops', 'Spicy Beef', 'Classic Ramen', 'Sacred Grove'], ceiling: 15.50, minModelSales:3, maxModels:5 },
+  { collection: 'Pool Float', models: ['Sebastian'], ceiling: 17.70, minModelSales:6, minCollectionSales:15, maxModels:1 },
 ];
 const RETIRED_COLLECTIONS = ['Whip Cupcake'];
 
@@ -84,7 +85,8 @@ export async function applyBlackPlan(key, {beforeWrite, fetcher=fetch, pause=ms=
   if(!Number.isFinite(available)||available<0)throw new Error('INVALID_BALANCE');
   if(profile.isAutobuyEnabled!==true)return {checked:BLACK_PLAN.length,changed:0,skipped:BLACK_PLAN.length,details:['Глобальная автопокупка выключена; лимиты не изменялись.']};
   const plannedNames=new Set(BLACK_PLAN.map(plan=>plan.collection));
-  const otherExposure=slots.filter(slot=>slot.portalsAutobuy===true&&!plannedNames.has(slot.collectionName))
+  const retiredNames=new Set(RETIRED_COLLECTIONS);
+  const otherExposure=slots.filter(slot=>slot.portalsAutobuy===true&&!plannedNames.has(slot.collectionName)&&!retiredNames.has(slot.collectionName))
     .reduce((sum,slot)=>sum+Number(slot.portalsAutobuyMaxPrice||0)*Number(slot.portalsAutobuyQuantity||0),0);
   const maximumExposure=(otherExposure+BLACK_PLAN.reduce((sum,plan)=>sum+plan.ceiling,0))*1.03;
   if(!Number.isFinite(maximumExposure)||maximumExposure>available+0.0001)
@@ -136,7 +138,7 @@ export async function applyBlackPlan(key, {beforeWrite, fetcher=fetch, pause=ms=
     if(!activation&&(slot.portalsAutobuy!==true||slot.portalsAutobuyQuantity!==1)){result.skipped++;result.details.push(`${plan.collection}: слот выключен или лимит покупок исчерпан`);continue;}
     const floor=await blackFloor(plan.collection,key,fetcher);
     const history=await modelReader(plan.collection,key,fetcher,new Date(),pause);
-    const candidates=history?.ok&&history.complete&&history.total>=20
+    const candidates=history?.ok&&history.complete&&history.total>=(plan.minCollectionSales??20)
       ?history.rows.filter(row=>plan.models.includes(row.model)&&row.count>=plan.minModelSales&&Number.isFinite(row.p25)&&row.p25>0)
         .sort((a,b)=>b.count-a.count||b.p25-a.p25||a.model.localeCompare(b.model,'en'))
         .slice(0,plan.maxModels)

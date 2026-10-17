@@ -18,9 +18,10 @@ const initialSlots = [
   active(3, 'Xmas Stocking', 15.94), active(4, 'B-Day Candle', 15.81),
   active(5, 'Whip Cupcake', 16.46), inactive(6, 'Snoop Dogg'),
   { ...inactive(7, 'Instant Ramen'), backdropNames: ['Black'] },
+  { ...inactive(8, 'Pool Float'), backdropNames: ['Black'] },
 ];
-const floors = { 'Vice Cream': 24.47, 'Chill Flame': 24.99, 'Xmas Stocking': 27.00, 'B-Day Candle': 24.47, 'Lol Pop': 29.13, 'Instant Ramen': 24.29 };
-const weakest = { 'Vice Cream': 19.79, 'Chill Flame': 21.74, 'Xmas Stocking': 20.45, 'B-Day Candle': 20.31, 'Lol Pop': 26.62, 'Instant Ramen': 20.45 };
+const floors = { 'Vice Cream': 24.47, 'Chill Flame': 24.99, 'Xmas Stocking': 27.00, 'B-Day Candle': 24.47, 'Lol Pop': 29.13, 'Instant Ramen': 24.29, 'Pool Float': 25.48 };
+const weakest = { 'Vice Cream': 19.79, 'Chill Flame': 21.74, 'Xmas Stocking': 20.45, 'B-Day Candle': 20.31, 'Lol Pop': 26.62, 'Instant Ramen': 20.45, 'Pool Float': 22.56 };
 const reply = data => ({ ok: true, status: 200, json: async () => data });
 
 function fixture({balance = 126.43, slots = initialSlots} = {}) {
@@ -45,7 +46,7 @@ function fixture({balance = 126.43, slots = initialSlots} = {}) {
     throw new Error(path);
   };
   const modelReader = async collection => ({
-    ok: true, complete: true, total: 30,
+    ok: true, complete: true, total: collection === 'Pool Float' ? 19 : 30,
     rows: BLACK_PLAN.find(item => item.collection === collection).models.map((model, index) => ({
       model, count: index === 0 ? 6 : 3, p25: weakest[collection] + (index === 0 ? 0 : 0.3),
     })),
@@ -53,20 +54,21 @@ function fixture({balance = 126.43, slots = initialSlots} = {}) {
   return { state, writes, fetcher, modelReader };
 }
 
-test('retires weak gift, enables two researched gifts, and verifies each write within balance', async () => {
+test('retires weak gift, enables three researched gifts including one exact model, and verifies each write within balance', async () => {
   const f = fixture();
   let guards = 0;
   const result = await applyBlackPlan('test', {
     fetcher: f.fetcher, modelReader: f.modelReader, pause: async () => {},
     beforeWrite: async () => { guards++; },
   });
-  assert.equal(result.changed, 7);
-  assert.equal(guards, 7);
-  assert.deepEqual(f.writes.slice(-2).map(item => item.portalsAutobuyMaxPrice), [20, 15.5]);
+  assert.equal(result.changed, 8);
+  assert.equal(guards, 8);
+  assert.deepEqual(f.writes.slice(-3).map(item => item.portalsAutobuyMaxPrice), [20, 15.5, 17.7]);
   assert.ok(f.writes.every(item => JSON.stringify(item.backdropNames) === '["Black"]'));
   assert.deepEqual(f.state.filter(item => item.portalsAutobuy).map(item => item.collectionName).sort(), BLACK_PLAN.map(item => item.collection).sort());
   assert.ok(BLACK_PLAN.reduce((sum, item) => sum + item.ceiling, 0) * 1.03 < 126.43);
   assert.equal(f.state.find(item => item.collectionName === 'Whip Cupcake').portalsAutobuyQuantity, 0);
+  assert.deepEqual(f.state.find(item => item.collectionName === 'Pool Float').modelNames, ['Sebastian']);
 });
 
 test('pause guard stops before the first provider write', async () => {
