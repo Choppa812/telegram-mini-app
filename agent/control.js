@@ -19,11 +19,11 @@ export function reportText(report) {
   ].filter(Boolean).join('\n');
 }
 
-export async function handleCommand(update, { ownerId, store, send, checkApi, marketOverview, floorOverview, inspectGift, feeOverview, turnoverOverview, blackDailySales, blackScan, positionsOverview, blackModels, modelMarkets, crossMarket, applyBlack, cleanBlack }) {
+export async function handleCommand(update, { ownerId, store, send, checkApi, marketOverview, floorOverview, inspectGift, feeOverview, turnoverOverview, blackDailySales, blackScan, positionsOverview, blackModels, modelMarkets, crossMarket, variantLeads, variantDetail, variantCross, applyBlack, cleanBlack }) {
   const m = update?.message;
   if (!ownerId || m?.chat?.type !== 'private' || String(m?.from?.id) !== String(ownerId) || String(m?.chat?.id) !== String(ownerId)) return false;
   const command = (m.text || '').trim().split(/\s/)[0].split('@')[0].toLowerCase();
-  if (!['/start', '/help', '/status', '/report', '/pause', '/resume', '/checkapi', '/market', '/floors', '/inspect', '/fees', '/rank', '/blackday', '/blackscan', '/blackscan90', '/positions', '/models', '/marketsales', '/cross', '/applyblack', '/blackclean'].includes(command)) return false;
+  if (!['/start', '/help', '/status', '/report', '/pause', '/resume', '/checkapi', '/market', '/floors', '/inspect', '/fees', '/rank', '/blackday', '/blackscan', '/blackscan90', '/positions', '/models', '/marketsales', '/cross', '/variants', '/variant', '/variantcross', '/applyblack', '/blackclean'].includes(command)) return false;
   if (!Number.isSafeInteger(update.update_id)) return false;
   if (command === '/blackclean') {
     const batch=Number((m.text||'').trim().replace(/^\S+\s*/,'').trim());
@@ -45,6 +45,16 @@ export async function handleCommand(update, { ownerId, store, send, checkApi, ma
     const filter=(m.text||'').trim().replace(/^\S+\s*/,'').trim();
     try { await send(await positionsOverview(filter)); }
     catch { await send('Текущие слоты не удалось прочитать.'); }
+  } else if (command === '/variants') {
+    const collection=(m.text||'').trim().replace(/^\S+\s*/,'').trim();
+    if(!collection)await send('Укажите коллекцию: /variants Pool Float');
+    else try { await send(await variantLeads(collection)); }
+    catch { await send('Варианты не удалось проверить. Слоты не менялись.'); }
+  } else if (command === '/variant' || command === '/variantcross') {
+    const [collection,model,backdrop]=(m.text||'').trim().replace(/^\S+\s*/,'').split('|').map(x=>x.trim());
+    if(!collection||!model||!backdrop)await send(`Укажите коллекцию, модель и фон: ${command} Pool Float | Sebastian | Black`);
+    else try { await send(await (command==='/variant'?variantDetail(collection,model,backdrop):variantCross(collection,model,backdrop))); }
+    catch { await send('Сочетание модели и фона не удалось проверить. Слоты не менялись.'); }
   } else if (command === '/models') {
     const collection=(m.text||'').trim().replace(/^\S+\s*/,'').trim();
     if(!collection)await send('Укажите коллекцию: /models Vice Cream');
