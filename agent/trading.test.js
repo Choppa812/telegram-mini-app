@@ -14,15 +14,16 @@ const inactive = (number, collection) => ({
   portalsAutobuyQuantity: 0,
 });
 const initialSlots = [
-  active(1, 'Vice Cream', 15.79), active(2, 'Chill Flame', 17.44),
-  active(3, 'Xmas Stocking', 15.27), inactive(4, 'Record Player'),
-  inactive(5, 'Jelly Bunny'),
+  active(1, 'Vice Cream', 15.34), active(2, 'Chill Flame', 17.13),
+  active(3, 'Xmas Stocking', 15.94), active(4, 'B-Day Candle', 15.81),
+  active(5, 'Whip Cupcake', 16.46), inactive(6, 'Snoop Dogg'),
+  { ...inactive(7, 'Instant Ramen'), backdropNames: ['Black'] },
 ];
-const floors = { 'Vice Cream': 21.14, 'Chill Flame': 23.27, 'Xmas Stocking': 21.40, 'B-Day Candle': 21.70, 'Whip Cupcake': 21.96 };
-const weakest = { 'Vice Cream': 19.79, 'Chill Flame': 21.74, 'Xmas Stocking': 20.45, 'B-Day Candle': 20.31, 'Whip Cupcake': 21.01 };
+const floors = { 'Vice Cream': 24.47, 'Chill Flame': 24.99, 'Xmas Stocking': 27.00, 'B-Day Candle': 24.47, 'Lol Pop': 29.13, 'Instant Ramen': 24.29 };
+const weakest = { 'Vice Cream': 19.79, 'Chill Flame': 21.74, 'Xmas Stocking': 20.45, 'B-Day Candle': 20.31, 'Lol Pop': 26.62, 'Instant Ramen': 20.45 };
 const reply = data => ({ ok: true, status: 200, json: async () => data });
 
-function fixture({balance = 87.23, slots = initialSlots} = {}) {
+function fixture({balance = 126.43, slots = initialSlots} = {}) {
   const state = structuredClone(slots), writes = [];
   const fetcher = async (url, options) => {
     const path = new URL(url).pathname;
@@ -52,19 +53,20 @@ function fixture({balance = 87.23, slots = initialSlots} = {}) {
   return { state, writes, fetcher, modelReader };
 }
 
-test('sets five approved Black gifts within the 87.23 TON balance and verifies each write', async () => {
+test('retires weak gift, enables two researched gifts, and verifies each write within balance', async () => {
   const f = fixture();
   let guards = 0;
   const result = await applyBlackPlan('test', {
     fetcher: f.fetcher, modelReader: f.modelReader, pause: async () => {},
     beforeWrite: async () => { guards++; },
   });
-  assert.equal(result.changed, 5);
-  assert.equal(guards, 5);
-  assert.deepEqual(f.writes.map(item => item.portalsAutobuyMaxPrice), [15.34, 17.13, 15.94, 15.81, 16.46]);
+  assert.equal(result.changed, 7);
+  assert.equal(guards, 7);
+  assert.deepEqual(f.writes.slice(-2).map(item => item.portalsAutobuyMaxPrice), [20, 15.5]);
   assert.ok(f.writes.every(item => JSON.stringify(item.backdropNames) === '["Black"]'));
   assert.deepEqual(f.state.filter(item => item.portalsAutobuy).map(item => item.collectionName).sort(), BLACK_PLAN.map(item => item.collection).sort());
-  assert.ok(BLACK_PLAN.reduce((sum, item) => sum + item.ceiling, 0) * 1.03 < 87.23);
+  assert.ok(BLACK_PLAN.reduce((sum, item) => sum + item.ceiling, 0) * 1.03 < 126.43);
+  assert.equal(f.state.find(item => item.collectionName === 'Whip Cupcake').portalsAutobuyQuantity, 0);
 });
 
 test('pause guard stops before the first provider write', async () => {
@@ -77,7 +79,7 @@ test('pause guard stops before the first provider write', async () => {
 });
 
 test('declines the whole plan when the balance cannot cover all limits and fees', async () => {
-  const f = fixture({ balance: 82 });
+  const f = fixture({ balance: 100 });
   const result = await applyBlackPlan('test', {
     fetcher: f.fetcher, modelReader: f.modelReader, pause: async () => {},
     beforeWrite: async () => {},
@@ -100,4 +102,31 @@ test('never selects an unapproved model even when its recent sales look attracti
     beforeWrite: async () => {},
   });
   assert.ok(f.writes.every(item => !item.modelNames.includes('Unapproved')));
+});
+
+test('disables an active gift when its Black models have insufficient sales', async () => {
+  const f = fixture();
+  const original = f.modelReader;
+  f.modelReader = async collection => collection === 'Vice Cream'
+    ? { ok:true, complete:true, total:30, rows:[] }
+    : original(collection);
+  const result = await applyBlackPlan('test', {
+    fetcher:f.fetcher, modelReader:f.modelReader, pause:async()=>{}, beforeWrite:async()=>{},
+  });
+  assert.equal(f.state.find(item => item.collectionName === 'Vice Cream').portalsAutobuy, false);
+  assert.match(result.details.join('\n'), /Vice Cream: автобай выключен/);
+});
+
+test('rechecks balance immediately before every write and stops after a balance drop', async () => {
+  const f=fixture();
+  const fetcher=async (url,options) => {
+    if(new URL(url).pathname.endsWith('/user/me')&&f.writes.length>0)
+      return reply({tonBalance:10,isAutobuyEnabled:true});
+    return f.fetcher(url,options);
+  };
+  await assert.rejects(applyBlackPlan('test',{
+    fetcher,modelReader:f.modelReader,pause:async()=>{},beforeWrite:async()=>{},
+  }),/BALANCE_CHANGED_BEFORE_WRITE/);
+  assert.equal(f.writes.length,1);
+  assert.equal(f.state.find(item=>item.collectionName==='Whip Cupcake').portalsAutobuy,false);
 });
