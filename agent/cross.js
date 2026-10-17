@@ -1,23 +1,25 @@
 const BASE = 'https://gift-satellite.dev/api';
 const MARKETS = ['tg', 'portals', 'tonnel', 'mrkt', 'getgems'];
 
-export async function readCrossMarket(collection, key, fetcher = fetch, pause = ms => new Promise(resolve => setTimeout(resolve, ms)), backdrop = 'Black') {
+export async function readCrossMarket(collection, key, fetcher = fetch, pause = ms => new Promise(resolve => setTimeout(resolve, ms)), backdrop = 'Black', model = '') {
   if (typeof collection !== 'string' || !/^[\p{L}\p{N} .'-]{2,80}$/u.test(collection) || !key) throw new Error('INVALID_CROSS_REQUEST');
   if (typeof backdrop !== 'string' || !/^[\p{L}\p{N} .'-]{2,80}$/u.test(backdrop)) throw new Error('INVALID_BACKDROP');
+  if (model && (typeof model !== 'string' || !/^[\p{L}\p{N} .!'-]{2,80}$/u.test(model))) throw new Error('INVALID_MODEL');
   const rows = [];
   for (const market of MARKETS) {
     const url = new URL(`${BASE}/search/${market}/${encodeURIComponent(collection)}`);
     url.searchParams.set('backdrops', backdrop);
+    if (model) url.searchParams.set('models', model);
     const response = await fetcher(url, { method: 'GET', headers: { Authorization: `Token ${key}`, Accept: 'application/json' }, redirect: 'error', signal: AbortSignal.timeout(12000) });
     if (!response.ok) return { ok: false, market, status: response.status, rows, writesPerformed: 0 };
     const data = await response.json();
     if (!Array.isArray(data)) throw new Error('INVALID_CROSS_RESPONSE');
-    const listings = data.filter(item => item?.backdropName === backdrop && (!item.currency || item.currency === 'ton') && Number.isFinite(Number(item.normalizedPrice)) && Number(item.normalizedPrice) > 0)
+    const listings = data.filter(item => item?.backdropName === backdrop && (!model || item?.modelName === model) && (!item.currency || item.currency === 'ton') && Number.isFinite(Number(item.normalizedPrice)) && Number(item.normalizedPrice) > 0)
       .map(item => ({ model: item.modelName, price: Number(item.normalizedPrice) })).sort((a, b) => a.price - b.price);
     rows.push({ market, count: listings.length, floor: listings[0]?.price ?? null, fifth: listings[4]?.price ?? null, listings });
     await pause(market === 'tg' ? 1500 : 550);
   }
-  return { ok: true, collection, backdrop, rows, writesPerformed: 0 };
+  return { ok: true, collection, backdrop, model, rows, writesPerformed: 0 };
 }
 
 export function crossMarketText(result, models = []) {
@@ -28,5 +30,5 @@ export function crossMarketText(result, models = []) {
     const byMarket = result.rows.map(row => ({ market: row.market, price: row.listings.find(item => item.model === model)?.price ?? null })).filter(row => row.price !== null);
     lines.push(`${model}: ${byMarket.length ? byMarket.map(row => `${row.market} ${price(row.price)}`).join(', ') : 'нет среди первых 50 листингов площадок'}`);
   }
-  return [`Gift Satellite — ${result.collection} ${result.backdrop || 'Black'} по площадкам`, ...lines, 'Отсутствие модели среди первых 50 листингов не означает отсутствия предложения. Слоты не менялись.'].join('\n');
+  return [`Gift Satellite — ${result.collection} ${result.model ? `${result.model} / ` : ''}${result.backdrop || 'Black'} по площадкам`, ...lines, result.model ? 'Поиск отфильтрован по конкретной модели и фону. Слоты не менялись.' : 'Отсутствие модели среди первых 50 листингов не означает отсутствия предложения. Слоты не менялись.'].join('\n');
 }

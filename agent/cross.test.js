@@ -35,3 +35,17 @@ test('fails closed when a market rejects a request', async () => {
   assert.equal(result.ok, false);
   assert.match(crossMarketText(result), /HTTP 429/);
 });
+
+test('exact variant search filters the API request and excludes other models', async () => {
+  const urls = [];
+  const result = await readCrossMarket('Pool Float', 'secret', async url => {
+    urls.push(new URL(url));
+    return { ok: true, json: async () => [
+      { modelName: 'Dark Swan', backdropName: 'Gunmetal', normalizedPrice: 7, currency: 'ton' },
+      { modelName: 'Motorboat', backdropName: 'Gunmetal', normalizedPrice: 4, currency: 'ton' },
+    ] };
+  }, async () => {}, 'Gunmetal', 'Dark Swan');
+  assert.equal(urls[0].searchParams.get('models'), 'Dark Swan');
+  assert.equal(urls[0].searchParams.get('backdrops'), 'Gunmetal');
+  assert.deepEqual(result.rows.map(row => row.floor), [7, 7, 7, 7, 7]);
+});
