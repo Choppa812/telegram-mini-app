@@ -1,1 +1,1 @@
-{"crons":[{"path":"/api/daily","schedule":"0 6 * * *"}]}
+{"crons":[{"path":"/api/daily","schedule":"0 6 * * *"}],"functions":{"api/daily.js":{"maxDuration":300},"api/telegram.js":{"maxDuration":300}}}

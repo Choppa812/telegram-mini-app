@@ -28,6 +28,18 @@ test('only owner private messages may change control state', async () => {
   assert.equal(s.state.paused, true);
   assert.equal(s.messages.length, 0);
 });
+test('portfolio activation is owner-only, pause-guarded and enables daily work after a checked batch',async()=>{
+  const s=setup();let calls=0,enabled=false;
+  s.store.enablePortfolio=async()=>{enabled=true;};
+  const deps={...s,apply28:async({batch,beforeWrite})=>{calls++;assert.equal(batch,0);await beforeWrite();return {checked:3,changed:3,skipped:0,details:['checked']};}};
+  await handleCommand(update(1,'/apply28 0',7),deps);
+  await handleCommand(update(2,'/apply28 0'),deps);
+  assert.equal(calls,0);assert.equal(enabled,false);
+  s.state.paused=false;
+  await handleCommand(update(3,'/apply28 0'),deps);
+  assert.equal(calls,1);assert.equal(enabled,true);
+  assert.equal(s.state.report.changed,3);
+});
 test('manual API check is owner-only, read-only, and does not resume paused automation', async () => {
   const s=setup();let calls=0;
   const deps={...s,checkApi:async()=>{calls++;return {ok:false,attempts:[{mode:'authorization',status:401}]};}};

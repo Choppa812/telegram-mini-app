@@ -19,13 +19,24 @@ export function reportText(report) {
   ].filter(Boolean).join('\n');
 }
 
-export async function handleCommand(update, { ownerId, store, send, checkApi, marketOverview, floorOverview, inspectGift, feeOverview, turnoverOverview, blackDailySales, blackScan, positionsOverview, blackModels, modelMarkets, crossMarket, variantLeads, variantDetail, variantCross, applyBlack, cleanBlack }) {
+export async function handleCommand(update, { ownerId, store, send, checkApi, marketOverview, floorOverview, inspectGift, feeOverview, turnoverOverview, blackDailySales, blackScan, positionsOverview, blackModels, modelMarkets, crossMarket, variantLeads, variantDetail, variantCross, applyBlack, apply28, cleanBlack }) {
   const m = update?.message;
   if (!ownerId || m?.chat?.type !== 'private' || String(m?.from?.id) !== String(ownerId) || String(m?.chat?.id) !== String(ownerId)) return false;
   const command = (m.text || '').trim().split(/\s/)[0].split('@')[0].toLowerCase();
-  if (!['/start', '/help', '/status', '/report', '/pause', '/resume', '/checkapi', '/market', '/floors', '/inspect', '/fees', '/rank', '/blackday', '/blackscan', '/blackscan90', '/positions', '/models', '/marketsales', '/cross', '/variants', '/variant', '/variantcross', '/applyblack', '/blackclean'].includes(command)) return false;
+  if (!['/start', '/help', '/status', '/report', '/pause', '/resume', '/checkapi', '/market', '/floors', '/inspect', '/fees', '/rank', '/blackday', '/blackscan', '/blackscan90', '/positions', '/models', '/marketsales', '/cross', '/variants', '/variant', '/variantcross', '/applyblack', '/apply28', '/blackclean'].includes(command)) return false;
   if (!Number.isSafeInteger(update.update_id)) return false;
-  if (command === '/blackclean') {
+  if (command === '/apply28') {
+    const batch=Number((m.text||'').trim().replace(/^\S+\s*/,'').trim());
+    if(!/\s+[0-6]\s*$/.test(m.text||''))await send('Укажите пакет от 0 до 6: /apply28 0');
+    else if(await store.isPaused())await send('Автонастройка на паузе. Для изменения слотов сначала /resume.');
+    else try {
+      const result=await apply28({batch,beforeWrite:async()=>{if(await store.isPaused())throw new Error('AUTOMATION_PAUSED');}});
+      await store.enablePortfolio();
+      const report={date:new Date().toISOString(),status:'completed',checked:result.checked,changed:result.changed,skipped:result.skipped,details:result.details};
+      await store.saveReport(report);
+      await send(`Black — настройка 28 слотов: изменено ${result.changed}, пропущено ${result.skipped}.\n${result.details.join('\n')}\nКаждая запись проверена повторным чтением API.`);
+    } catch(error){await send(`Black — настройка 28 прервана: ${String(error?.message||'ERROR').replace(/[^\p{L}\p{N}_ .,;:()\[\]-]/gu,'').slice(0,150)}. Проверьте /positions.`);}
+  } else if (command === '/blackclean') {
     const batch=Number((m.text||'').trim().replace(/^\S+\s*/,'').trim());
     if(!Number.isInteger(batch)||batch<0||batch>10)await send('Укажите пакет: /blackclean 0');
     else if(await store.isPaused())await send('Автонастройка на паузе. Для изменения слотов сначала /resume.');

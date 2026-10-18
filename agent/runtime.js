@@ -25,6 +25,8 @@ export function runtime(env = process.env, fetcher = fetch) {
   const store = {
     // Missing state is paused. Unavailable storage throws and prevents writes.
     isPaused: async () => (await redis('GET', `${prefix}paused`)) !== '0',
+    isPortfolioEnabled: async () => (await redis('GET', `${prefix}portfolio-enabled`)) === '1',
+    enablePortfolio: () => redis('SET', `${prefix}portfolio-enabled`, '1'),
     command: async (id, paused) => redis('EVAL', "local old=redis.call('GET',KEYS[1]); if old and tonumber(old)>=tonumber(ARGV[1]) then return 0 end; redis.call('SET',KEYS[1],ARGV[1]); redis.call('SET',KEYS[2],ARGV[2]); return 1", 2, `${prefix}update`, `${prefix}paused`, String(id), paused ? '1' : '0'),
     getReport: async () => decode(await redis('GET', `${prefix}report`)),
     saveReport: report => redis('SET', `${prefix}report`, JSON.stringify(report)),

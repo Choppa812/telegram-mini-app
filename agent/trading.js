@@ -11,9 +11,8 @@ export const BLACK_PLAN = [
   { collection: 'Instant Ramen', models: ['Chicken', 'Sunny Loops', 'Spicy Beef', 'Classic Ramen', 'Sacred Grove'], ceiling: 15.50, minModelSales:3, maxModels:5 },
   { collection: 'Pool Float', models: ['Sebastian'], ceiling: 17.70, minModelSales:6, minCollectionSales:15, maxModels:1 },
 ];
-const RETIRED_COLLECTIONS = ['Whip Cupcake'];
 
-function subscriptionBody(slot, plan, price) {
+export function subscriptionBody(slot, plan, price) {
   const keys = ['subscriptionName','collectionName','numberPattern','portalsNotifyMaxPrice','notifyTg','notifyPortals','notifyTonnel','notifyMrkt','notifyGetgems','portalsAutobuy','portalsAutobuyQuantity','autobuyTg','autobuyPortals','autobuyTonnel','autobuyMrkt','forwardToChat','forwardToTopic'];
   const body = Object.fromEntries(keys.filter(key => slot[key] !== undefined).map(key => [key,slot[key]]));
   if(typeof body.numberPattern!=='string'||!/^[A-Za-z0-9]{1,6}$/.test(body.numberPattern))delete body.numberPattern;
@@ -46,7 +45,7 @@ export async function cleanBlackBatch(key, batch, {beforeWrite,fetcher=fetch,pau
   return {batch,totals:legacy.length,processed:selected.length,remaining:Math.max(0,legacy.length-(batch+1)*4),details};
 }
 
-async function blackFloor(collection, key, fetcher) {
+async function blackFloor(collection, key, fetcher, pause) {
   const prices=[];
   for (const market of ['tg','portals','tonnel','mrkt','getgems']) {
     const url=new URL(`${BASE}/search/${market}/${encodeURIComponent(collection)}`);
@@ -60,12 +59,13 @@ async function blackFloor(collection, key, fetcher) {
       const price=Number(row.normalizedPrice);
       if((!row.currency||row.currency==='ton')&&Number.isFinite(price)&&price>0)prices.push(price);
     }
+    await pause(600);
   }
   if(!prices.length)throw new Error('BLACK_MARKET_EMPTY');
   return Math.min(...prices);
 }
 
-async function writeSubscription(id, body, key, fetcher) {
+export async function writeSubscription(id, body, key, fetcher) {
   if(!/^[a-f0-9]{24}$/i.test(id||''))throw new Error('INVALID_SUBSCRIPTION_ID');
   const response=await fetcher(new URL(`${BASE}/user/update-subscription/${id}`),{method:'PUT',headers:{Authorization:`Token ${key}`,Accept:'application/json','Content-Type':'application/json'},body:JSON.stringify(body),redirect:'error',signal:AbortSignal.timeout(12000)});
   if(!response.ok){
@@ -84,13 +84,6 @@ export async function applyBlackPlan(key, {beforeWrite, fetcher=fetch, pause=ms=
   const available=Number(profile.tonBalance);
   if(!Number.isFinite(available)||available<0)throw new Error('INVALID_BALANCE');
   if(profile.isAutobuyEnabled!==true)return {checked:BLACK_PLAN.length,changed:0,skipped:BLACK_PLAN.length,details:['Глобальная автопокупка выключена; лимиты не изменялись.']};
-  const plannedNames=new Set(BLACK_PLAN.map(plan=>plan.collection));
-  const retiredNames=new Set(RETIRED_COLLECTIONS);
-  const otherExposure=slots.filter(slot=>slot.portalsAutobuy===true&&!plannedNames.has(slot.collectionName)&&!retiredNames.has(slot.collectionName))
-    .reduce((sum,slot)=>sum+Number(slot.portalsAutobuyMaxPrice||0)*Number(slot.portalsAutobuyQuantity||0),0);
-  const maximumExposure=(otherExposure+BLACK_PLAN.reduce((sum,plan)=>sum+plan.ceiling,0))*1.03;
-  if(!Number.isFinite(maximumExposure)||maximumExposure>available+0.0001)
-    return {checked:BLACK_PLAN.length,changed:0,skipped:BLACK_PLAN.length,details:[`Баланс ${available.toFixed(2)} TON недостаточен для плана с резервом комиссии (${maximumExposure.toFixed(2)} TON); слоты не менялись.`]};
   async function verifyBudgetBeforeWrite(slot, body) {
     const [latestSlots,latestProfile]=await Promise.all([readSatellite('/user/subscriptions',{},key,'token',fetcher),readSatellite('/user/me',{},key,'token',fetcher)]);
     if(!latestSlots.ok||!Array.isArray(latestSlots.data)||!latestProfile.ok)throw new Error('ACCOUNT_REREAD_FAILED');
@@ -98,15 +91,11 @@ export async function applyBlackPlan(key, {beforeWrite, fetcher=fetch, pause=ms=
     if(!current||current.collectionName!==slot.collectionName||current.portalsAutobuy!==slot.portalsAutobuy)throw new Error('SLOT_CHANGED_DURING_ANALYSIS');
     const currentBalance=Number(latestProfile.data?.tonBalance);
     if(!Number.isFinite(currentBalance)||currentBalance<0)throw new Error('INVALID_BALANCE');
-    let exposure=0;
-    for(const s of latestSlots.data){
-      const proposed=s._id===slot._id?body:s;
-      if(proposed.portalsAutobuy!==true)continue;
-      const price=Number(proposed.portalsAutobuyMaxPrice),quantity=Number(proposed.portalsAutobuyQuantity);
+    if(body.portalsAutobuy===true){
+      const price=Number(body.portalsAutobuyMaxPrice),quantity=Number(body.portalsAutobuyQuantity);
       if(!Number.isFinite(price)||price<0||!Number.isInteger(quantity)||quantity<1)throw new Error('INVALID_ACTIVE_SLOT');
-      exposure+=price*quantity;
+      if(price*quantity*1.03>currentBalance+0.0001)throw new Error('BALANCE_CHANGED_BEFORE_WRITE');
     }
-    if(exposure*1.03>currentBalance+0.0001)throw new Error('BALANCE_CHANGED_BEFORE_WRITE');
   }
   async function disable(slot, reason) {
     const body=subscriptionBody(slot,{models:slot.modelNames||[]},slot.portalsAutobuyMaxPrice);
@@ -122,21 +111,19 @@ export async function applyBlackPlan(key, {beforeWrite, fetcher=fetch, pause=ms=
     result.details.push(`${slot.collectionName}: автобай выключен — ${reason}`);
     await pause(600);
   }
-  for(const collection of RETIRED_COLLECTIONS){
-    const matches=slots.filter(s=>s.collectionName===collection&&JSON.stringify(s.backdropNames)==='["Black"]');
-    if(matches.length>1)throw new Error(`SLOT_NOT_UNIQUE_${collection}`);
-    if(matches[0]?.portalsAutobuy===true){result.checked++;await disable(matches[0],'нет подтверждённой ликвидности текущих моделей Black');}
-  }
   for(const plan of BLACK_PLAN){
     result.checked++;
-    const matches=slots.filter(s=>s.collectionName===plan.collection&&Array.isArray(s.backdropNames)&&s.backdropNames.length===1&&s.backdropNames[0]==='Black');
+    const matches=slots.length===28?slots.filter(s=>s.collectionName===plan.collection&&JSON.stringify(s.backdropNames)==='["Black"]'&&
+      Array.isArray(s.modelNames)&&s.modelNames.some(model=>plan.models.includes(model)))
+      :slots.filter(s=>s.collectionName===plan.collection&&Array.isArray(s.backdropNames)&&s.backdropNames.length===1&&s.backdropNames[0]==='Black');
+    if(slots.length===28&&matches.length!==1)throw new Error(`SLOT_CHANGED_${plan.collection}`);
     if(matches.length>1)throw new Error(`SLOT_NOT_UNIQUE_${plan.collection}`);
     const source=!matches.length&&plan.sourceCollection?slots.filter(s=>s.collectionName===plan.sourceCollection&&s.portalsAutobuy===false&&s.portalsAutobuyQuantity===0):[];
     if(!matches.length&&source.length!==1)throw new Error(`SLOT_NOT_UNIQUE_${plan.collection}`);
     const slot=matches[0]||source[0];
     const activation=source.length===1||(slot.portalsAutobuy===false&&slot.portalsAutobuyQuantity===0);
     if(!activation&&(slot.portalsAutobuy!==true||slot.portalsAutobuyQuantity!==1)){result.skipped++;result.details.push(`${plan.collection}: слот выключен или лимит покупок исчерпан`);continue;}
-    const floor=await blackFloor(plan.collection,key,fetcher);
+    const floor=await blackFloor(plan.collection,key,fetcher,pause);
     const history=await modelReader(plan.collection,key,fetcher,new Date(),pause);
     const candidates=history?.ok&&history.complete&&history.total>=(plan.minCollectionSales??20)
       ?history.rows.filter(row=>plan.models.includes(row.model)&&row.count>=plan.minModelSales&&Number.isFinite(row.p25)&&row.p25>0)

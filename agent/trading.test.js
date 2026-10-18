@@ -24,7 +24,7 @@ const floors = { 'Vice Cream': 24.47, 'Chill Flame': 24.99, 'Xmas Stocking': 27.
 const weakest = { 'Vice Cream': 19.79, 'Chill Flame': 21.74, 'Xmas Stocking': 20.45, 'B-Day Candle': 20.31, 'Lol Pop': 26.62, 'Instant Ramen': 20.45, 'Pool Float': 22.56 };
 const reply = data => ({ ok: true, status: 200, json: async () => data });
 
-function fixture({balance = 126.43, slots = initialSlots} = {}) {
+function fixture({balance = 100, slots = initialSlots} = {}) {
   const state = structuredClone(slots), writes = [];
   const fetcher = async (url, options) => {
     const path = new URL(url).pathname;
@@ -54,20 +54,18 @@ function fixture({balance = 126.43, slots = initialSlots} = {}) {
   return { state, writes, fetcher, modelReader };
 }
 
-test('retires weak gift, enables three researched gifts including one exact model, and verifies each write within balance', async () => {
+test('enables researched gifts including one exact model and verifies each write', async () => {
   const f = fixture();
   let guards = 0;
   const result = await applyBlackPlan('test', {
     fetcher: f.fetcher, modelReader: f.modelReader, pause: async () => {},
     beforeWrite: async () => { guards++; },
   });
-  assert.equal(result.changed, 8);
-  assert.equal(guards, 8);
+  assert.equal(result.changed, 7);
+  assert.equal(guards, 7);
   assert.deepEqual(f.writes.slice(-3).map(item => item.portalsAutobuyMaxPrice), [20, 15.5, 17.7]);
   assert.ok(f.writes.every(item => JSON.stringify(item.backdropNames) === '["Black"]'));
-  assert.deepEqual(f.state.filter(item => item.portalsAutobuy).map(item => item.collectionName).sort(), BLACK_PLAN.map(item => item.collection).sort());
-  assert.ok(BLACK_PLAN.reduce((sum, item) => sum + item.ceiling, 0) * 1.03 < 126.43);
-  assert.equal(f.state.find(item => item.collectionName === 'Whip Cupcake').portalsAutobuyQuantity, 0);
+  assert.ok(BLACK_PLAN.every(plan=>f.state.some(item=>item.collectionName===plan.collection&&item.portalsAutobuy)));
   assert.deepEqual(f.state.find(item => item.collectionName === 'Pool Float').modelNames, ['Sebastian']);
 });
 
@@ -80,15 +78,14 @@ test('pause guard stops before the first provider write', async () => {
   assert.equal(f.writes.length, 0);
 });
 
-test('declines the whole plan when the balance cannot cover all limits and fees', async () => {
+test('allows aggregate overcommit while checking every individual slot', async () => {
   const f = fixture({ balance: 100 });
   const result = await applyBlackPlan('test', {
     fetcher: f.fetcher, modelReader: f.modelReader, pause: async () => {},
     beforeWrite: async () => {},
   });
-  assert.equal(result.changed, 0);
-  assert.equal(f.writes.length, 0);
-  assert.match(result.details[0], /недостаточен/);
+  assert.equal(result.changed, 7);
+  assert.equal(f.writes.length, 7);
 });
 
 test('never selects an unapproved model even when its recent sales look attractive', async () => {
@@ -130,5 +127,17 @@ test('rechecks balance immediately before every write and stops after a balance 
     fetcher,modelReader:f.modelReader,pause:async()=>{},beforeWrite:async()=>{},
   }),/BALANCE_CHANGED_BEFORE_WRITE/);
   assert.equal(f.writes.length,1);
-  assert.equal(f.state.find(item=>item.collectionName==='Whip Cupcake').portalsAutobuy,false);
+  assert.equal(f.state.find(item=>item.collectionName==='Whip Cupcake').portalsAutobuy,true);
+});
+
+test('uses original slot indexes when multiple slots share a collection',async()=>{
+  const slots=Array.from({length:28},(_,index)=>inactive(index+1,'Unused'));
+  const indexes={'Vice Cream':12,'Chill Flame':26,'Xmas Stocking':1,'B-Day Candle':27,'Lol Pop':14,'Instant Ramen':15,'Pool Float':11};
+  for(const plan of BLACK_PLAN){const index=indexes[plan.collection];slots[index-1]={...active(index,plan.collection,plan.ceiling),modelNames:[plan.models[0]]};}
+  slots[2]={...active(3,'Vice Cream',16.2),modelNames:['Sushi']};
+  const f=fixture({slots});
+  const result=await applyBlackPlan('test',{fetcher:f.fetcher,modelReader:f.modelReader,pause:async()=>{},beforeWrite:async()=>{}});
+  assert.equal(result.checked,7);
+  assert.equal(f.state[2].modelNames[0],'Sushi');
+  assert.equal(f.state[2].portalsAutobuy,true);
 });

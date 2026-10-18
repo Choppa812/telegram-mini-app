@@ -1,0 +1,62 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { applyPortfolioSlot } from './portfolio.js';
+
+const TEST_PLAN=[{slot:3,original:'Unused',collection:'Example Gift',model:'Example Model',ceiling:10,minWeek:8}];
+
+const reply=data=>({ok:true,status:200,json:async()=>data});
+const slot=(index,collection)=>({
+  _id:index.toString(16).padStart(24,'0'),subscriptionName:collection,collectionName:collection,
+  modelNames:[],backdropNames:[],portalsAutobuy:false,portalsAutobuyQuantity:0,
+  portalsAutobuyMaxPrice:null,autobuyTg:false,autobuyPortals:false,autobuyTonnel:false,autobuyMrkt:false,
+});
+function fixture(balance=100){
+  const state=Array.from({length:28},(_,index)=>slot(index+1,index===2?'Unused':'Other'));
+  const writes=[];
+  const fetcher=async(url,options)=>{
+    const path=new URL(url).pathname;
+    if(path.endsWith('/user/subscriptions'))return reply(state);
+    if(path.endsWith('/user/me'))return reply({tonBalance:balance,isAutobuyEnabled:true});
+    if(path.includes('/update-subscription/')){
+      const row=state.find(s=>s._id===path.split('/').at(-1));
+      assert.ok(row);assert.equal(options.method,'PUT');
+      const body=JSON.parse(options.body);Object.assign(row,body);writes.push(body);return reply(null);
+    }
+    throw new Error(path);
+  };
+  const variantReader=async(collection,model,backdrop)=>({ok:true,complete:true,collection,model,backdrop,
+    day:{count:3},week:{count:12,q1:45}});
+  const marketReader=async(collection,key,fetcher,pause,backdrop,model)=>({ok:true,collection,backdrop,model,
+    rows:['tg','portals','tonnel','mrkt','getgems'].map(market=>({market,floor:50}))});
+  return {state,writes,fetcher,variantReader,marketReader,pause:async()=>{},portfolio:TEST_PLAN};
+}
+
+test('activates exact Black model while allowing aggregate limits above balance',async()=>{
+  const f=fixture();let guards=0;
+  const result=await applyPortfolioSlot(3,'test',{...f,beforeWrite:async()=>{guards++;}});
+  assert.equal(result.changed,true);assert.equal(result.price,10);
+  assert.equal(guards,1);assert.equal(f.writes.length,1);
+  assert.deepEqual(f.state[2].modelNames,['Example Model']);
+  assert.deepEqual(f.state[2].backdropNames,['Black']);
+  assert.equal(f.state[2].portalsAutobuy,true);
+});
+
+test('pause guard blocks provider write',async()=>{
+  const f=fixture();
+  await assert.rejects(applyPortfolioSlot(3,'test',{...f,beforeWrite:async()=>{throw Error('AUTOMATION_PAUSED');}}),/AUTOMATION_PAUSED/);
+  assert.equal(f.writes.length,0);
+});
+
+test('requires complete exact-model sales and per-purchase balance',async()=>{
+  const f=fixture(5);
+  assert.equal((await applyPortfolioSlot(3,'test',{...f,beforeWrite:async()=>{}})).reason,'BALANCE_INSUFFICIENT_FOR_SINGLE_PURCHASE');
+  assert.equal(f.writes.length,0);
+  await assert.rejects(applyPortfolioSlot(3,'test',{...f,variantReader:async()=>({ok:true,complete:false,day:{count:9},week:{count:17,q1:45}}),beforeWrite:async()=>{}}),/EXACT_SALES_UNAVAILABLE/);
+  assert.equal(f.writes.length,0);
+});
+
+test('rejects changed slot mapping before any write',async()=>{
+  const f=fixture();f.state[2].collectionName='Unrelated';
+  await assert.rejects(applyPortfolioSlot(3,'test',{...f,beforeWrite:async()=>{}}),/SLOT_CHANGED/);
+  assert.equal(f.writes.length,0);
+});

@@ -141,3 +141,7 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Private trading research and Vercel configuration
+agent/market-review-*.md
+agent/portfolio-plan.private.json
