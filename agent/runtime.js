@@ -27,6 +27,12 @@ export function runtime(env = process.env, fetcher = fetch) {
     isPaused: async () => (await redis('GET', `${prefix}paused`)) !== '0',
     isPortfolioEnabled: async () => (await redis('GET', `${prefix}portfolio-enabled`)) === '1',
     enablePortfolio: () => redis('SET', `${prefix}portfolio-enabled`, '1'),
+    claimCompetitive: async updateId => {
+      const lease = randomUUID();
+      const ok = await redis('EVAL', "if redis.call('EXISTS',KEYS[1])==1 or redis.call('EXISTS',KEYS[2])==1 then return 0 end; redis.call('SET',KEYS[1],ARGV[1],'EX','600'); redis.call('SET',KEYS[2],'1','EX','86400'); return 1", 2, `${prefix}competitive-lease`, `${prefix}competitive-update:${updateId}`, lease);
+      return ok ? lease : null;
+    },
+    releaseCompetitive: lease => redis('EVAL', "if redis.call('GET',KEYS[1])==ARGV[1] then return redis.call('DEL',KEYS[1]) end; return 0", 1, `${prefix}competitive-lease`, lease),
     command: async (id, paused) => redis('EVAL', "local old=redis.call('GET',KEYS[1]); if old and tonumber(old)>=tonumber(ARGV[1]) then return 0 end; redis.call('SET',KEYS[1],ARGV[1]); redis.call('SET',KEYS[2],ARGV[2]); return 1", 2, `${prefix}update`, `${prefix}paused`, String(id), paused ? '1' : '0'),
     getReport: async () => decode(await redis('GET', `${prefix}report`)),
     saveReport: report => redis('SET', `${prefix}report`, JSON.stringify(report)),

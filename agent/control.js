@@ -35,11 +35,16 @@ export async function handleCommand(update, { ownerId, store, send, checkApi, ma
   if (!Number.isSafeInteger(update.update_id)) return false;
   if (command === '/applycompetitive') {
     if(await store.isPaused())await send('Автонастройка на паузе. Для изменения слотов сначала /resume.');
-    else try {
-      const result=await applyCompetitive({beforeWrite:async()=>{if(await store.isPaused())throw new Error('AUTOMATION_PAUSED');}});
-      await store.saveReport({date:new Date().toISOString(),status:'completed',checked:result.checked,changed:result.changed,skipped:result.skipped,details:result.details});
-      await send(`Точные модели Black: изменено ${result.changed}, без изменений ${result.skipped}.\n${result.details.join('\n')}\nКаждая запись проверена повторным чтением API.`);
-    } catch(error){await send(`Настройка точных моделей прервана: ${String(error?.message||'ERROR').replace(/[^\p{L}\p{N}_ .,;:()\[\]-]/gu,'').slice(0,150)}. Проверьте /positions.`);}
+    else {
+      const lease=await store.claimCompetitive?.(update.update_id);
+      if(store.claimCompetitive&&!lease)return true;
+      try {
+        const result=await applyCompetitive({beforeWrite:async()=>{if(await store.isPaused())throw new Error('AUTOMATION_PAUSED');}});
+        await store.saveReport({date:new Date().toISOString(),status:'completed',checked:result.checked,changed:result.changed,skipped:result.skipped,details:result.details});
+        await send(`Точные модели Black: изменено ${result.changed}, без изменений ${result.skipped}.\n${result.details.join('\n')}\nКаждая запись проверена повторным чтением API.`);
+      } catch(error){await send(`Настройка точных моделей прервана: ${String(error?.message||'ERROR').replace(/[^\p{L}\p{N}_ .,;:()\[\]-]/gu,'').slice(0,150)}. Проверьте /positions.`);}
+      finally {if(lease)await store.releaseCompetitive(lease);}
+    }
   } else if (command === '/apply28') {
     const batch=Number((m.text||'').trim().replace(/^\S+\s*/,'').trim());
     if(!/\s+[0-6]\s*$/.test(m.text||''))await send('Укажите пакет от 0 до 6: /apply28 0');
