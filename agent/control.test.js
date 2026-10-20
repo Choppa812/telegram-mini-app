@@ -40,6 +40,17 @@ test('portfolio activation is owner-only, pause-guarded and enables daily work a
   assert.equal(calls,1);assert.equal(enabled,true);
   assert.equal(s.state.report.changed,3);
 });
+test('competitive command is owner-only and checks pause before each provider write',async()=>{
+  const s=setup();let calls=0;
+  const deps={...s,applyCompetitive:async({beforeWrite})=>{calls++;await beforeWrite();return {checked:4,changed:4,skipped:0,details:['four verified slots']};}};
+  await handleCommand(update(1,'/applycompetitive',7),deps);
+  await handleCommand(update(2,'/applycompetitive'),deps);
+  assert.equal(calls,0);
+  s.state.paused=false;
+  await handleCommand(update(3,'/applycompetitive'),deps);
+  assert.equal(calls,1);assert.equal(s.state.report.changed,4);
+  assert.match(s.messages.at(-1),/Каждая запись проверена/);
+});
 test('manual API check is owner-only, read-only, and does not resume paused automation', async () => {
   const s=setup();let calls=0;
   const deps={...s,checkApi:async()=>{calls++;return {ok:false,attempts:[{mode:'authorization',status:401}]};}};

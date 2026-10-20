@@ -51,17 +51,21 @@ function fixture({balance = 100, slots = initialSlots} = {}) {
       model, count: index === 0 ? 6 : 3, p25: weakest[collection] + (index === 0 ? 0 : 0.3),
     })),
   });
-  return { state, writes, fetcher, modelReader };
+  const variantReader=async()=>({ok:true,complete:true,day:{count:8,q1:22.81},week:{count:43,q1:22.24}});
+  const marketReader=async()=>({ok:true,model:'Bamboo Ice',backdrop:'Black',rows:['tg','portals','tonnel','mrkt','getgems'].map(market=>({market,floor:23.97}))});
+  return { state, writes, fetcher, modelReader, variantReader, marketReader };
 }
 
 test('enables researched gifts including one exact model and verifies each write', async () => {
   const f = fixture();
   let guards = 0;
   const result = await applyBlackPlan('test', {
-    fetcher: f.fetcher, modelReader: f.modelReader, pause: async () => {},
+    fetcher: f.fetcher, modelReader: f.modelReader, variantReader:f.variantReader, marketReader:f.marketReader, pause: async () => {},
     beforeWrite: async () => { guards++; },
   });
   assert.equal(result.changed, 7);
+  assert.equal(f.writes[0].portalsAutobuyMaxPrice,18.90);
+  assert.deepEqual(f.writes[0].modelNames,['Bamboo Ice']);
   assert.equal(guards, 7);
   assert.deepEqual(f.writes.slice(-3).map(item => item.portalsAutobuyMaxPrice), [20, 15.5, 17.7]);
   assert.ok(f.writes.every(item => JSON.stringify(item.backdropNames) === '["Black"]'));
@@ -72,7 +76,7 @@ test('enables researched gifts including one exact model and verifies each write
 test('pause guard stops before the first provider write', async () => {
   const f = fixture();
   await assert.rejects(applyBlackPlan('test', {
-    fetcher: f.fetcher, modelReader: f.modelReader, pause: async () => {},
+    fetcher: f.fetcher, modelReader: f.modelReader, variantReader:f.variantReader, marketReader:f.marketReader, pause: async () => {},
     beforeWrite: async () => { throw new Error('AUTOMATION_PAUSED'); },
   }), /AUTOMATION_PAUSED/);
   assert.equal(f.writes.length, 0);
@@ -81,7 +85,7 @@ test('pause guard stops before the first provider write', async () => {
 test('allows aggregate overcommit while checking every individual slot', async () => {
   const f = fixture({ balance: 100 });
   const result = await applyBlackPlan('test', {
-    fetcher: f.fetcher, modelReader: f.modelReader, pause: async () => {},
+    fetcher: f.fetcher, modelReader: f.modelReader, variantReader:f.variantReader, marketReader:f.marketReader, pause: async () => {},
     beforeWrite: async () => {},
   });
   assert.equal(result.changed, 7);
@@ -97,7 +101,7 @@ test('never selects an unapproved model even when its recent sales look attracti
     return result;
   };
   await applyBlackPlan('test', {
-    fetcher: f.fetcher, modelReader: f.modelReader, pause: async () => {},
+    fetcher: f.fetcher, modelReader: f.modelReader, variantReader:f.variantReader, marketReader:f.marketReader, pause: async () => {},
     beforeWrite: async () => {},
   });
   assert.ok(f.writes.every(item => !item.modelNames.includes('Unapproved')));
@@ -105,12 +109,9 @@ test('never selects an unapproved model even when its recent sales look attracti
 
 test('disables an active gift when its Black models have insufficient sales', async () => {
   const f = fixture();
-  const original = f.modelReader;
-  f.modelReader = async collection => collection === 'Vice Cream'
-    ? { ok:true, complete:true, total:30, rows:[] }
-    : original(collection);
+  f.variantReader = async()=>({ok:true,complete:true,day:{count:1,q1:22},week:{count:3,q1:22}});
   const result = await applyBlackPlan('test', {
-    fetcher:f.fetcher, modelReader:f.modelReader, pause:async()=>{}, beforeWrite:async()=>{},
+    fetcher:f.fetcher, modelReader:f.modelReader, variantReader:f.variantReader, marketReader:f.marketReader, pause:async()=>{}, beforeWrite:async()=>{},
   });
   assert.equal(f.state.find(item => item.collectionName === 'Vice Cream').portalsAutobuy, false);
   assert.match(result.details.join('\n'), /Vice Cream: автобай выключен/);
@@ -124,7 +125,7 @@ test('rechecks balance immediately before every write and stops after a balance 
     return f.fetcher(url,options);
   };
   await assert.rejects(applyBlackPlan('test',{
-    fetcher,modelReader:f.modelReader,pause:async()=>{},beforeWrite:async()=>{},
+    fetcher,modelReader:f.modelReader,variantReader:f.variantReader,marketReader:f.marketReader,pause:async()=>{},beforeWrite:async()=>{},
   }),/BALANCE_CHANGED_BEFORE_WRITE/);
   assert.equal(f.writes.length,1);
   assert.equal(f.state.find(item=>item.collectionName==='Whip Cupcake').portalsAutobuy,true);
@@ -136,7 +137,7 @@ test('uses original slot indexes when multiple slots share a collection',async()
   for(const plan of BLACK_PLAN){const index=indexes[plan.collection];slots[index-1]={...active(index,plan.collection,plan.ceiling),modelNames:[plan.models[0]]};}
   slots[2]={...active(3,'Vice Cream',16.2),modelNames:['Sushi']};
   const f=fixture({slots});
-  const result=await applyBlackPlan('test',{fetcher:f.fetcher,modelReader:f.modelReader,pause:async()=>{},beforeWrite:async()=>{}});
+  const result=await applyBlackPlan('test',{fetcher:f.fetcher,modelReader:f.modelReader,variantReader:f.variantReader,marketReader:f.marketReader,pause:async()=>{},beforeWrite:async()=>{}});
   assert.equal(result.checked,7);
   assert.equal(f.state[2].modelNames[0],'Sushi');
   assert.equal(f.state[2].portalsAutobuy,true);

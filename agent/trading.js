@@ -1,10 +1,14 @@
 import { readSatellite } from './satellite.js';
 import { readBlackModels } from './planning.js';
 import { fetchReadWithRetry } from './read-retry.js';
+import { readVariant } from './variants.js';
+import { readCrossMarket } from './cross.js';
+import { competitivePrice } from './competitive.js';
 
 const BASE = 'https://gift-satellite.dev/api';
+const sameArrays = (a,b) => JSON.stringify(a) === JSON.stringify(b);
 export const BLACK_PLAN = [
-  { collection: 'Vice Cream', models: ['Bamboo Ice', 'Birthday', 'Cherry On Top', 'Iceman', 'Mermaid', 'Dreamland'], ceiling: 15.34, minModelSales:2, maxModels:6 },
+  { collection: 'Vice Cream', models: ['Bamboo Ice'], ceiling: 18.90, minWeek: 8, pricing: 'competitive' },
   { collection: 'Chill Flame', models: ['Dungeon', 'Tribal Totem', 'Dark Relic', 'Druid Flame', 'Birthday Cake'], ceiling: 17.13, minModelSales:2, maxModels:5 },
   { collection: 'Xmas Stocking', models: ['Frozen Moss', 'Toffee', 'Cherry', 'Poison Ivy'], ceiling: 15.94, minModelSales:2, maxModels:4 },
   { collection: 'B-Day Candle', sourceCollection: 'Record Player', models: ['Be Awesome!', 'Fresh Mint', 'Best Wishes'], ceiling: 15.81, minModelSales:2, maxModels:3 },
@@ -76,7 +80,7 @@ export async function writeSubscription(id, body, key, fetcher) {
   }
 }
 
-export async function applyBlackPlan(key, {beforeWrite, onProgress=()=>{}, fetcher=fetch, pause=ms=>new Promise(resolve=>setTimeout(resolve,ms)), modelReader=readBlackModels}={}) {
+export async function applyBlackPlan(key, {beforeWrite, onProgress=()=>{}, fetcher=fetch, pause=ms=>new Promise(resolve=>setTimeout(resolve,ms)), modelReader=readBlackModels, variantReader=readVariant, marketReader=readCrossMarket, plans=BLACK_PLAN}={}) {
   if(!key||typeof beforeWrite!=='function')throw new Error('TRADING_CONFIGURATION_MISSING');
   const result={checked:0,changed:0,skipped:0,details:[]};
   const [slotsResult,profileResult]=await Promise.all([readSatellite('/user/subscriptions',{},key,'token',fetcher),readSatellite('/user/me',{},key,'token',fetcher)]);
@@ -84,7 +88,7 @@ export async function applyBlackPlan(key, {beforeWrite, onProgress=()=>{}, fetch
   const slots=slotsResult.data,profile=profileResult.data;
   const available=Number(profile.tonBalance);
   if(!Number.isFinite(available)||available<0)throw new Error('INVALID_BALANCE');
-  if(profile.isAutobuyEnabled!==true)return {checked:BLACK_PLAN.length,changed:0,skipped:BLACK_PLAN.length,details:['Глобальная автопокупка выключена; лимиты не изменялись.']};
+  if(profile.isAutobuyEnabled!==true)return {checked:plans.length,changed:0,skipped:plans.length,details:['Глобальная автопокупка выключена; лимиты не изменялись.']};
   async function verifyBudgetBeforeWrite(slot, body) {
     const [latestSlots,latestProfile]=await Promise.all([readSatellite('/user/subscriptions',{},key,'token',fetcher),readSatellite('/user/me',{},key,'token',fetcher)]);
     if(!latestSlots.ok||!Array.isArray(latestSlots.data)||!latestProfile.ok)throw new Error('ACCOUNT_REREAD_FAILED');
@@ -113,7 +117,7 @@ export async function applyBlackPlan(key, {beforeWrite, onProgress=()=>{}, fetch
     await onProgress({ ...result, details:[...result.details] });
     await pause(600);
   }
-  for(const plan of BLACK_PLAN){
+  for(const plan of plans){
     result.checked++;
     const matches=slots.length===28?slots.filter(s=>s.collectionName===plan.collection&&JSON.stringify(s.backdropNames)==='["Black"]'&&
       Array.isArray(s.modelNames)&&s.modelNames.some(model=>plan.models.includes(model)))
@@ -125,6 +129,42 @@ export async function applyBlackPlan(key, {beforeWrite, onProgress=()=>{}, fetch
     const slot=matches[0]||source[0];
     const activation=source.length===1||(slot.portalsAutobuy===false&&slot.portalsAutobuyQuantity===0);
     if(!activation&&(slot.portalsAutobuy!==true||slot.portalsAutobuyQuantity!==1)){result.skipped++;result.details.push(`${plan.collection}: слот выключен или лимит покупок исчерпан`);continue;}
+    if(plan.pricing==='competitive'){
+      if(plan.models.length!==1)throw new Error('INVALID_COMPETITIVE_PLAN');
+      const model=plan.models[0];
+      const history=await variantReader(plan.collection,model,'Black',key,{fetcher,pause});
+      if(!history?.ok||!history.complete)throw new Error('EXACT_SALES_UNAVAILABLE');
+      if(history.week.count<plan.minWeek||history.day.count<2||!Number.isFinite(history.day.q1)||!Number.isFinite(history.week.q1)){
+        if(slot.portalsAutobuy===true)await disable(slot,'недостаточно точных продаж модели Black');
+        else {result.skipped++;result.details.push(`${plan.collection} / ${model}: недостаточно точных продаж`);}
+        continue;
+      }
+      const market=await marketReader(plan.collection,key,fetcher,pause,'Black',model);
+      if(!market?.ok||market.model!==model||market.backdrop!=='Black'||!Array.isArray(market.rows)||market.rows.length!==5)throw new Error('EXACT_MARKET_UNAVAILABLE');
+      const floors=market.rows.map(row=>Number(row.floor)).filter(price=>Number.isFinite(price)&&price>0);
+      if(!floors.length)throw new Error('EXACT_MARKET_EMPTY');
+      const floor=Math.min(...floors);
+      const price=competitivePrice({ceiling:plan.ceiling,day:history.day.q1,week:history.week.q1,floor});
+      if(price<=0)throw new Error('INVALID_PRICE');
+      if(available<price*1.03){result.skipped++;result.details.push(`${plan.collection} / ${model}: недостаточный баланс`);continue;}
+      const body=subscriptionBody(slot,{models:[model]},price);
+      if(activation)Object.assign(body,{subscriptionName:`${plan.collection} / ${model} / Black`,collectionName:plan.collection,portalsAutobuy:true,portalsAutobuyQuantity:1,symbolNames:[],autobuyTg:true,autobuyPortals:true,autobuyTonnel:true,autobuyMrkt:true});
+      if(!activation&&Math.abs(Number(slot.portalsAutobuyMaxPrice)-price)<.001&&sameArrays(slot.modelNames,[model])){
+        result.skipped++;result.details.push(`${plan.collection} / ${model}: без изменений, ${price.toFixed(2)} TON`);continue;
+      }
+      await verifyBudgetBeforeWrite(slot,body);
+      await beforeWrite();
+      await writeSubscription(slot._id,body,key,fetcher);
+      await pause(600);
+      const verify=await readSatellite('/user/subscriptions',{},key,'token',fetcher);
+      const saved=verify.ok&&Array.isArray(verify.data)?verify.data.find(s=>s._id===slot._id):null;
+      if(!saved||saved.collectionName!==plan.collection||saved.portalsAutobuy!==true||saved.portalsAutobuyQuantity!==1||Math.abs(Number(saved.portalsAutobuyMaxPrice)-price)>.001||!sameArrays(saved.modelNames,[model])||!sameArrays(saved.backdropNames,['Black']))throw new Error(`UPDATE_NOT_VERIFIED_${plan.collection}`);
+      result.changed++;
+      result.details.push(`${plan.collection} / ${model} / Black: ${price.toFixed(2)} TON; ${history.day.count}/${history.week.count} продаж`);
+      await onProgress({...result,details:[...result.details]});
+      await pause(600);
+      continue;
+    }
     const floor=await blackFloor(plan.collection,key,fetcher,pause);
     const history=await modelReader(plan.collection,key,fetcher,new Date(),pause);
     const candidates=history?.ok&&history.complete&&history.total>=(plan.minCollectionSales??20)

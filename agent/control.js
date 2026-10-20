@@ -2,7 +2,7 @@ export const STOP_NOTICE = 'Автонастройка и ежедневные �
 
 function safeFailureCode(error) {
   const message = String(error?.message || 'UNEXPECTED_ERROR');
-  const safe = new Set(['ACCOUNT_READ_FAILED','ACCOUNT_REREAD_FAILED','EXACT_SALES_UNAVAILABLE','EXACT_MARKET_UNAVAILABLE','EXACT_MARKET_EMPTY','BLACK_MARKET_EMPTY','INVALID_MARKET','INVALID_MARKET_BACKDROP','INVALID_HISTORY','INVALID_HISTORY_DATE','UNSORTED_HISTORY','INVALID_VARIANT_HISTORY','INVALID_VARIANT_DATE','UNSORTED_VARIANT_HISTORY','INVALID_BALANCE','INVALID_PRICE','INVALID_ACTIVE_SLOT','BALANCE_CHANGED_BEFORE_WRITE','SLOT_CHANGED','SLOT_CHANGED_DURING_ANALYSIS','SLOT_ALREADY_ACTIVE','ACTIVE_MODELS_CHANGED','SLOT_QUANTITY_CHANGED','GLOBAL_AUTOBUY_DISABLED','DISABLE_NOT_VERIFIED','PORTFOLIO_WRITE_NOT_VERIFIED','PRIVATE_PORTFOLIO_PLAN_MISSING','INVALID_PRIVATE_PORTFOLIO_PLAN','AUTOMATION_PAUSED','INVALID_REPORT']);
+  const safe = new Set(['ACCOUNT_READ_FAILED','ACCOUNT_REREAD_FAILED','EXACT_SALES_UNAVAILABLE','EXACT_MARKET_UNAVAILABLE','EXACT_MARKET_EMPTY','BLACK_MARKET_EMPTY','INVALID_MARKET','INVALID_MARKET_BACKDROP','INVALID_HISTORY','INVALID_HISTORY_DATE','UNSORTED_HISTORY','INVALID_VARIANT_HISTORY','INVALID_VARIANT_DATE','UNSORTED_VARIANT_HISTORY','INVALID_BALANCE','INVALID_PRICE','INVALID_ACTIVE_SLOT','BALANCE_CHANGED_BEFORE_WRITE','SLOT_CHANGED','SLOT_CHANGED_DURING_ANALYSIS','SLOT_ALREADY_ACTIVE','ACTIVE_MODELS_CHANGED','SLOT_QUANTITY_CHANGED','GLOBAL_AUTOBUY_DISABLED','DISABLE_NOT_VERIFIED','PORTFOLIO_WRITE_NOT_VERIFIED','PRIVATE_PORTFOLIO_PLAN_MISSING','INVALID_PRIVATE_PORTFOLIO_PLAN','COMPETITIVE_PLAN_NOT_PUBLISHED','AUTOMATION_PAUSED','INVALID_REPORT']);
   if (safe.has(message)) return message;
   const provider = /^(MARKET|UPDATE)_(429|500|502|503|504)(?:_|$)/.exec(message);
   return provider ? `${provider[1]}_${provider[2]}` : 'UNEXPECTED_ERROR';
@@ -27,13 +27,20 @@ export function reportText(report) {
   ].filter(Boolean).join('\n');
 }
 
-export async function handleCommand(update, { ownerId, store, send, checkApi, marketOverview, floorOverview, inspectGift, feeOverview, turnoverOverview, blackDailySales, blackScan, positionsOverview, blackModels, modelMarkets, crossMarket, variantLeads, variantDetail, variantCross, applyBlack, apply28, cleanBlack }) {
+export async function handleCommand(update, { ownerId, store, send, checkApi, marketOverview, floorOverview, inspectGift, feeOverview, turnoverOverview, blackDailySales, blackScan, positionsOverview, blackModels, modelMarkets, crossMarket, variantLeads, variantDetail, variantCross, applyBlack, apply28, applyCompetitive, cleanBlack }) {
   const m = update?.message;
   if (!ownerId || m?.chat?.type !== 'private' || String(m?.from?.id) !== String(ownerId) || String(m?.chat?.id) !== String(ownerId)) return false;
   const command = (m.text || '').trim().split(/\s/)[0].split('@')[0].toLowerCase();
-  if (!['/start', '/help', '/status', '/report', '/pause', '/resume', '/checkapi', '/market', '/floors', '/inspect', '/fees', '/rank', '/blackday', '/blackscan', '/blackscan90', '/positions', '/models', '/marketsales', '/cross', '/variants', '/variant', '/variantcross', '/applyblack', '/apply28', '/blackclean'].includes(command)) return false;
+  if (!['/start', '/help', '/status', '/report', '/pause', '/resume', '/checkapi', '/market', '/floors', '/inspect', '/fees', '/rank', '/blackday', '/blackscan', '/blackscan90', '/positions', '/models', '/marketsales', '/cross', '/variants', '/variant', '/variantcross', '/applyblack', '/apply28', '/applycompetitive', '/blackclean'].includes(command)) return false;
   if (!Number.isSafeInteger(update.update_id)) return false;
-  if (command === '/apply28') {
+  if (command === '/applycompetitive') {
+    if(await store.isPaused())await send('Автонастройка на паузе. Для изменения слотов сначала /resume.');
+    else try {
+      const result=await applyCompetitive({beforeWrite:async()=>{if(await store.isPaused())throw new Error('AUTOMATION_PAUSED');}});
+      await store.saveReport({date:new Date().toISOString(),status:'completed',checked:result.checked,changed:result.changed,skipped:result.skipped,details:result.details});
+      await send(`Точные модели Black: изменено ${result.changed}, без изменений ${result.skipped}.\n${result.details.join('\n')}\nКаждая запись проверена повторным чтением API.`);
+    } catch(error){await send(`Настройка точных моделей прервана: ${String(error?.message||'ERROR').replace(/[^\p{L}\p{N}_ .,;:()\[\]-]/gu,'').slice(0,150)}. Проверьте /positions.`);}
+  } else if (command === '/apply28') {
     const batch=Number((m.text||'').trim().replace(/^\S+\s*/,'').trim());
     if(!/\s+[0-6]\s*$/.test(m.text||''))await send('Укажите пакет от 0 до 6: /apply28 0');
     else if(await store.isPaused())await send('Автонастройка на паузе. Для изменения слотов сначала /resume.');

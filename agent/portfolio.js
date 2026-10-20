@@ -2,6 +2,7 @@ import { readSatellite } from './satellite.js';
 import { readVariant } from './variants.js';
 import { readCrossMarket } from './cross.js';
 import { subscriptionBody, writeSubscription } from './trading.js';
+import { competitivePrice } from './competitive.js';
 
 // The user's slot assignments and trading limits are stored only in a private
 // Vercel environment variable, never in the public repository.
@@ -13,7 +14,9 @@ export function loadPortfolio(raw=process.env.PRIVATE_PORTFOLIO_PLAN) {
   for(const row of rows){
     if(!Number.isInteger(row.slot)||row.slot<1||row.slot>28||slots.has(row.slot)||
        !['original','collection','model'].every(key=>typeof row[key]==='string'&&row[key].length>1&&row[key].length<81)||
-       !Number.isFinite(row.ceiling)||row.ceiling<=0||!Number.isInteger(row.minWeek)||row.minWeek<3)
+       !Number.isFinite(row.ceiling)||row.ceiling<=0||!Number.isInteger(row.minWeek)||row.minWeek<3||
+       (row.pricing!==undefined&&row.pricing!=='competitive')||
+       (row.previousModel!==undefined&&(typeof row.previousModel!=='string'||row.previousModel.length<2||row.previousModel.length>80)))
       throw new Error('INVALID_PRIVATE_PORTFOLIO_PLAN');
     slots.add(row.slot);
   }
@@ -36,13 +39,16 @@ export async function applyPortfolioSlot(slotNumber, key, {
   if(!slotsResponse.ok||!Array.isArray(slotsResponse.data)||!profileResponse.ok)throw new Error('ACCOUNT_READ_FAILED');
   if(profileResponse.data?.isAutobuyEnabled!==true)throw new Error('GLOBAL_AUTOBUY_DISABLED');
   const slot=slotsResponse.data[slotNumber-1];
-  if(!slot||slot.collectionName!==plan.original&&!(slot.collectionName===plan.collection&&same(slot.modelNames,[plan.model])&&same(slot.backdropNames,['Black'])))throw new Error('SLOT_CHANGED');
+  const planned=slot?.collectionName===plan.collection&&same(slot.modelNames,[plan.model])&&same(slot.backdropNames,['Black']);
+  const previous=slot?.collectionName===plan.original&&(!plan.previousModel||same(slot.modelNames,[plan.previousModel]));
+  if(!slot||!planned&&!previous)throw new Error('SLOT_CHANGED');
   if(slot.portalsAutobuy===true&&slot.collectionName!==plan.collection)throw new Error('SLOT_ALREADY_ACTIVE');
   if(slot.portalsAutobuy===true&&!same(slot.modelNames,[plan.model]))throw new Error('ACTIVE_MODELS_CHANGED');
   if(slot.portalsAutobuyQuantity>1)throw new Error('SLOT_QUANTITY_CHANGED');
   const history=await variantReader(plan.collection,plan.model,'Black',key,{fetcher,pause});
   if(!history?.ok||!history.complete)throw new Error('EXACT_SALES_UNAVAILABLE');
-  if(history.week.count<plan.minWeek||history.day.count<2||!Number.isFinite(history.week.q1)){
+  if(history.week.count<plan.minWeek||history.day.count<2||!Number.isFinite(history.week.q1)||
+     (plan.pricing==='competitive'&&!Number.isFinite(history.day.q1))){
     if(slot.portalsAutobuy!==true)return {slot:slotNumber,changed:false,reason:'INSUFFICIENT_EXACT_SALES'};
     const body=subscriptionBody(slot,{models:[plan.model]},slot.portalsAutobuyMaxPrice);
     Object.assign(body,{portalsAutobuy:false,portalsAutobuyQuantity:0,autobuyTg:false,autobuyPortals:false,autobuyTonnel:false,autobuyMrkt:false});
@@ -63,7 +69,9 @@ export async function applyPortfolioSlot(slotNumber, key, {
   const floors=market.rows.map(row=>Number(row.floor)).filter(value=>Number.isFinite(value)&&value>0);
   if(!floors.length)throw new Error('EXACT_MARKET_EMPTY');
   const floor=Math.min(...floors);
-  const price=roundDown(Math.min(plan.ceiling,(history.week.q1*.92-3)/1.03,floor-2));
+  const price=plan.pricing==='competitive'
+    ? competitivePrice({ceiling:plan.ceiling,day:history.day.q1,week:history.week.q1,floor})
+    : roundDown(Math.min(plan.ceiling,(history.week.q1*.92-3)/1.03,floor-2));
   if(!Number.isFinite(price)||price<=0)throw new Error('INVALID_PRICE');
   const [latestSlots,latestProfile]=await Promise.all([
     readSatellite('/user/subscriptions',{},key,'token',fetcher),
