@@ -1,5 +1,6 @@
 import { readSatellite } from './satellite.js';
 import { readBlackModels } from './planning.js';
+import { fetchReadWithRetry } from './read-retry.js';
 
 const BASE = 'https://gift-satellite.dev/api';
 export const BLACK_PLAN = [
@@ -50,7 +51,7 @@ async function blackFloor(collection, key, fetcher, pause) {
   for (const market of ['tg','portals','tonnel','mrkt','getgems']) {
     const url=new URL(`${BASE}/search/${market}/${encodeURIComponent(collection)}`);
     url.searchParams.set('backdrops','Black');
-    const response=await fetcher(url,{method:'GET',headers:{Authorization:`Token ${key}`,Accept:'application/json'},redirect:'error',signal:AbortSignal.timeout(12000)});
+    const response=await fetchReadWithRetry(url,{method:'GET',headers:{Authorization:`Token ${key}`,Accept:'application/json'},redirect:'error'},fetcher,pause);
     if(!response.ok)throw new Error(`MARKET_${response.status}`);
     const rows=await response.json();
     if(!Array.isArray(rows))throw new Error('INVALID_MARKET');
@@ -75,7 +76,7 @@ export async function writeSubscription(id, body, key, fetcher) {
   }
 }
 
-export async function applyBlackPlan(key, {beforeWrite, fetcher=fetch, pause=ms=>new Promise(resolve=>setTimeout(resolve,ms)), modelReader=readBlackModels}={}) {
+export async function applyBlackPlan(key, {beforeWrite, onProgress=()=>{}, fetcher=fetch, pause=ms=>new Promise(resolve=>setTimeout(resolve,ms)), modelReader=readBlackModels}={}) {
   if(!key||typeof beforeWrite!=='function')throw new Error('TRADING_CONFIGURATION_MISSING');
   const result={checked:0,changed:0,skipped:0,details:[]};
   const [slotsResult,profileResult]=await Promise.all([readSatellite('/user/subscriptions',{},key,'token',fetcher),readSatellite('/user/me',{},key,'token',fetcher)]);
@@ -109,6 +110,7 @@ export async function applyBlackPlan(key, {beforeWrite, fetcher=fetch, pause=ms=
     if(!current||current.portalsAutobuy!==false||current.portalsAutobuyQuantity!==0)throw new Error(`DISABLE_NOT_VERIFIED_${slot.collectionName}`);
     result.changed++;
     result.details.push(`${slot.collectionName}: автобай выключен — ${reason}`);
+    await onProgress({ ...result, details:[...result.details] });
     await pause(600);
   }
   for(const plan of BLACK_PLAN){
@@ -159,6 +161,7 @@ export async function applyBlackPlan(key, {beforeWrite, fetcher=fetch, pause=ms=
     if(!current||current.collectionName!==plan.collection||current.portalsAutobuy!==true||current.portalsAutobuyQuantity!==1||Math.abs(Number(current.portalsAutobuyMaxPrice)-price)>0.001||JSON.stringify(current.modelNames)!==JSON.stringify(models)||JSON.stringify(current.backdropNames)!=='["Black"]')throw new Error(`UPDATE_NOT_VERIFIED_${plan.collection}`);
     result.changed++;
     result.details.push(`${plan.collection}: ${activation?'новый слот':`${Number(slot.portalsAutobuyMaxPrice).toFixed(2)} →`} ${price.toFixed(2)} TON; ${models.length} моделей; floor ${floor.toFixed(2)}; Black-сделок ${history?.total??'?'}`);
+    await onProgress({ ...result, details:[...result.details] });
     await pause(600);
   }
   return result;

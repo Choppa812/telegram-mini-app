@@ -108,6 +108,28 @@ test('provider failure never exposes credentials or pretends success', async () 
   assert.equal(s.state.report.status, 'error');
   assert.ok(s.messages.every(x => !x.includes('secret-key-example')));
 });
+test('transient failure remains retryable and reports only verified progress and a safe reason', async () => {
+  const s = setup(); s.state.paused = false; let runs = 0;
+  const run = async ({onProgress}) => {
+    runs++;
+    if (runs === 1) {
+      onProgress({checked:3,changed:1,skipped:2,details:['первый слот проверен']});
+      throw new Error('EXACT_MARKET_UNAVAILABLE');
+    }
+    return {checked:28,changed:0,skipped:28,details:[]};
+  };
+  const first = await dailyReport({...s,run,notifyOnError:false});
+  assert.equal(first.retryable,true);
+  assert.equal(first.changed,1);
+  assert.equal(s.state.done,false);
+  assert.equal(s.state.dayReport,null);
+  assert.equal(s.messages.length,0);
+  const second = await dailyReport({...s,run});
+  assert.equal(second.status,'completed');
+  assert.equal(second.changed,1);
+  assert.equal(runs,2);
+  assert.equal(s.state.done,true);
+});
 test('undelivered report is retried without repeating a completed calculation', async () => {
   const s = setup(); s.state.paused = false; let runs = 0;
   const run = async () => { runs++; return { checked: 1, changed: 1, skipped: 0 }; };

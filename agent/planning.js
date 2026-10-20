@@ -1,4 +1,5 @@
 import { readSatellite } from './satellite.js';
+import { fetchReadWithRetry } from './read-retry.js';
 
 const BASE = 'https://gift-satellite.dev/api';
 
@@ -21,7 +22,7 @@ export async function readBlackModels(collection,key,fetcher=fetch,now=new Date(
   let total=0,complete=false,pages=0;
   for(let page=0;page<12;page++){
     if(page)await pause(650);
-    const response=await fetcher(new URL(`${BASE}/history/${encodeURIComponent(collection)}`),{method:'POST',headers:{Authorization:`Token ${key}`,Accept:'application/json','Content-Type':'application/json'},body:JSON.stringify({page,pageSize:20,sortBy:'date',backdrops:['Black']}),redirect:'error',signal:AbortSignal.timeout(12000)});
+    const response=await fetchReadWithRetry(new URL(`${BASE}/history/${encodeURIComponent(collection)}`),{method:'POST',headers:{Authorization:`Token ${key}`,Accept:'application/json','Content-Type':'application/json'},body:JSON.stringify({page,pageSize:20,sortBy:'date',backdrops:['Black']}),redirect:'error'},fetcher,pause);
     if(!response.ok)return {ok:false,status:response.status};
     const data=await response.json();if(!Array.isArray(data?.content))throw new Error('INVALID_HISTORY');
     pages++;

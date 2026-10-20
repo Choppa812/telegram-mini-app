@@ -106,6 +106,7 @@ export async function applyPortfolio(key, options={}) {
       ? row.disabled ? `#${row.slot} ${row.collection} / ${row.model}: выключен — мало точных продаж`
       : `#${row.slot} ${row.collection} / ${row.model} / Black: ${row.price.toFixed(2)} TON; ${row.daySales}/${row.weekSales} продаж`
       : `#${row.slot} ${plan.collection} / ${plan.model}: ${row.reason}`);
+    if (options.onProgress) await options.onProgress({ ...result, details:[...result.details] });
   }
   return result;
 }

@@ -1,5 +1,6 @@
 const BASE = 'https://gift-satellite.dev/api';
 const MODES = ['token'];
+import { fetchReadWithRetry } from './read-retry.js';
 
 export async function readSatellite(path, params, key, mode, fetcher = fetch) {
   if (!['/user/subscriptions', '/user/me', '/user/purchases', '/gift/collections', '/history/collection-offers', '/history/floors', '/history/collections'].includes(path)) throw new Error('UNSUPPORTED_READ_PATH');
@@ -7,7 +8,7 @@ export async function readSatellite(path, params, key, mode, fetcher = fetch) {
   const url = new URL(BASE + path);
   for (const [name, value] of Object.entries(params || {})) url.searchParams.set(name, String(value));
   const headers = { Authorization: `Token ${key}` };
-  const response = await fetcher(url, { method: 'GET', headers: { ...headers, Accept: 'application/json' }, redirect: 'error', signal: AbortSignal.timeout(12000) });
+  const response = await fetchReadWithRetry(url, { method: 'GET', headers: { ...headers, Accept: 'application/json' }, redirect: 'error' }, fetcher);
   if (!response.ok) {
     let message;
     try { const body = await response.json(); if (typeof body.message === 'string') message = body.message.replaceAll(key, '[REDACTED]').slice(0,160); } catch {}

@@ -1,4 +1,5 @@
 import { readSatellite } from './satellite.js';
+import { fetchReadWithRetry } from './read-retry.js';
 
 const BASE = 'https://gift-satellite.dev/api';
 const BATCH = 8;
@@ -17,7 +18,7 @@ export async function scanBlackBatch(index, token, fetcher = fetch, now = new Da
   const rows=[];
   for (const collection of selected) {
     await pause(550);
-    const response = await fetcher(new URL(`${BASE}/history/${encodeURIComponent(collection)}`),{method:'POST',headers:{Authorization:`Token ${token}`,Accept:'application/json','Content-Type':'application/json'},body:JSON.stringify({page:0,pageSize:20,sortBy:'date',backdrops:['Black']}),redirect:'error',signal:AbortSignal.timeout(12000)});
+    const response = await fetchReadWithRetry(new URL(`${BASE}/history/${encodeURIComponent(collection)}`),{method:'POST',headers:{Authorization:`Token ${token}`,Accept:'application/json','Content-Type':'application/json'},body:JSON.stringify({page:0,pageSize:20,sortBy:'date',backdrops:['Black']}),redirect:'error'},fetcher,pause);
     if (!response.ok) return {ok:false,statuses:[a.status,b.status,response.status],collection};
     const data=await response.json();
     if (!Array.isArray(data?.content)) throw new Error('INVALID_BLACK_HISTORY');

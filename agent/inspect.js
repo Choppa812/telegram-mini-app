@@ -1,10 +1,11 @@
 const BASE = 'https://gift-satellite.dev/api';
+import { fetchReadWithRetry } from './read-retry.js';
 
 async function request(path, token, {body, query, fetcher = fetch} = {}) {
   if (!token) throw new Error('API_KEY_MISSING');
   const url = new URL(BASE + path);
   if (query) for (const [key, value] of Object.entries(query)) url.searchParams.set(key, String(value));
-  const response = await fetcher(url, { method:body ? 'POST' : 'GET', headers:{Authorization:`Token ${token}`,Accept:'application/json',...(body?{'Content-Type':'application/json'}:{})}, ...(body?{body:JSON.stringify(body)}:{}),redirect:'error',signal:AbortSignal.timeout(12000) });
+  const response = await fetchReadWithRetry(url, { method:body ? 'POST' : 'GET', headers:{Authorization:`Token ${token}`,Accept:'application/json',...(body?{'Content-Type':'application/json'}:{})}, ...(body?{body:JSON.stringify(body)}:{}),redirect:'error' }, fetcher);
   if (!response.ok) return {status:response.status,data:null};
   return {status:response.status,data:await response.json()};
 }

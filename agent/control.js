@@ -1,5 +1,13 @@
 export const STOP_NOTICE = 'Автонастройка и ежедневные сообщения остановлены до /resume. Уже отправленный запрос может завершиться. Автопокупка в Gift Satellite продолжает работать по ранее установленным лимитам.';
 
+function safeFailureCode(error) {
+  const message = String(error?.message || 'UNEXPECTED_ERROR');
+  const safe = new Set(['ACCOUNT_READ_FAILED','ACCOUNT_REREAD_FAILED','EXACT_SALES_UNAVAILABLE','EXACT_MARKET_UNAVAILABLE','EXACT_MARKET_EMPTY','BLACK_MARKET_EMPTY','INVALID_MARKET','INVALID_MARKET_BACKDROP','INVALID_HISTORY','INVALID_HISTORY_DATE','UNSORTED_HISTORY','INVALID_VARIANT_HISTORY','INVALID_VARIANT_DATE','UNSORTED_VARIANT_HISTORY','INVALID_BALANCE','INVALID_PRICE','INVALID_ACTIVE_SLOT','BALANCE_CHANGED_BEFORE_WRITE','SLOT_CHANGED','SLOT_CHANGED_DURING_ANALYSIS','SLOT_ALREADY_ACTIVE','ACTIVE_MODELS_CHANGED','SLOT_QUANTITY_CHANGED','GLOBAL_AUTOBUY_DISABLED','DISABLE_NOT_VERIFIED','PORTFOLIO_WRITE_NOT_VERIFIED','PRIVATE_PORTFOLIO_PLAN_MISSING','INVALID_PRIVATE_PORTFOLIO_PLAN','AUTOMATION_PAUSED','INVALID_REPORT']);
+  if (safe.has(message)) return message;
+  const provider = /^(MARKET|UPDATE)_(429|500|502|503|504)(?:_|$)/.exec(message);
+  return provider ? `${provider[1]}_${provider[2]}` : 'UNEXPECTED_ERROR';
+}
+
 export function reportText(report) {
   if (!report) return 'Отчётов пока нет.';
   const states = { paused: 'Автонастройка на паузе', disconnected: 'API Gift Satellite ещё не подключён', blocked: 'Настройка цен заблокирована', completed: 'Настройка завершена', error: 'Проверка не завершена' };
@@ -14,7 +22,7 @@ export function reportText(report) {
     report.reason === 'write_contract_unverified' ? 'Чтение API доступно; метод изменения лимитов ещё не проверен.' : null,
     report.status === 'blocked' ? 'Цены в реальном приложении не изменялись.' : null,
     report.status === 'disconnected' ? 'Цены в реальном приложении не изменялись.' : null,
-    report.status === 'error' ? 'Изменения прекращены. Нужно проверить подключение API.' : null,
+    report.status === 'error' ? `Проверка прервана: ${report.reason || 'UNEXPECTED_ERROR'}. Подтверждено изменений: ${report.changed ?? 0}. ${report.retryPending ? 'Повторная проверка запланирована.' : 'Повторная проверка не удалась; требуется вмешательство.'}` : null,
     '/status — состояние · /pause — остановить · /resume — возобновить',
   ].filter(Boolean).join('\n');
 }
@@ -126,7 +134,7 @@ export async function handleCommand(update, { ownerId, store, send, checkApi, ma
 }
 
 // Every provider write must call the pause guard immediately beforehand.
-export async function dailyReport({ store, send, run, now = new Date() }) {
+export async function dailyReport({ store, send, run, now = new Date(), notifyOnError = true }) {
   // Paused cron invocations are silent and do not consume the day's run.
   if (await store.isPaused()) return { status: 'paused', silent: true };
   const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Moscow', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
@@ -140,6 +148,9 @@ export async function dailyReport({ store, send, run, now = new Date() }) {
       await store.finishDay(day);
       return cached;
     }
+    const previous = await store.getReport();
+    const previousChanges = previous?.status === 'error' && previous.date?.startsWith(day) ? (previous.changed || 0) : 0;
+    const previousDetails = previousChanges ? (previous.details || []) : [];
     const report = { date: now.toISOString(), status: 'disconnected' };
     try {
       if (await store.isPaused()) report.status = 'paused';
@@ -147,21 +158,35 @@ export async function dailyReport({ store, send, run, now = new Date() }) {
         const beforeWrite = async () => {
           if (await store.isPaused()) throw new Error('AUTOMATION_PAUSED');
         };
-        const result = await run({ beforeWrite });
+        const onProgress = progress => {
+          for (const key of ['checked', 'changed', 'skipped']) {
+            if (Number.isSafeInteger(progress?.[key]) && progress[key] >= 0) report[key] = key === 'changed' ? previousChanges + progress[key] : progress[key];
+          }
+          if (Array.isArray(progress?.details)) report.details = [...previousDetails,...progress.details].slice(-10).map(String);
+        };
+        const result = await run({ beforeWrite, onProgress });
         for (const key of ['checked', 'changed', 'skipped']) {
           if (!Number.isSafeInteger(result?.[key]) || result[key] < 0) throw new Error('INVALID_REPORT');
-          report[key] = result[key];
+          report[key] = key === 'changed' ? previousChanges + result[key] : result[key];
         }
-        if (Array.isArray(result.details)) report.details = result.details.slice(0,10).map(String);
+        if (Array.isArray(result.details)) report.details = [...previousDetails,...result.details].slice(-10).map(String);
         report.status = result.status === 'blocked' ? 'blocked' : 'completed';
         if (['api_authorization_failed', 'write_contract_unverified'].includes(result.reason)) report.reason = result.reason;
       }
-    } catch {
+    } catch (error) {
       report.status = (await store.isPaused()) ? 'paused' : 'error';
+      if (report.status === 'error') {
+        report.reason = safeFailureCode(error);
+        report.retryPending = !notifyOnError;
+      }
     }
     await store.saveReport(report);
-    await store.saveDayReport(day, report);
     if (await store.isPaused()) return { ...report, silent: true };
+    if (report.status === 'error') {
+      if (notifyOnError) await send(reportText(report));
+      return { ...report, retryable: true, silent: !notifyOnError };
+    }
+    await store.saveDayReport(day, report);
     await send(reportText(report));
     await store.finishDay(day);
     return report;

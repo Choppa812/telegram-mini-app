@@ -1,5 +1,6 @@
 const BASE = 'https://gift-satellite.dev/api';
 const MARKETS = ['tg', 'portals', 'tonnel', 'mrkt', 'getgems'];
+import { fetchReadWithRetry } from './read-retry.js';
 
 export async function readCrossMarket(collection, key, fetcher = fetch, pause = ms => new Promise(resolve => setTimeout(resolve, ms)), backdrop = 'Black', model = '') {
   if (typeof collection !== 'string' || !/^[\p{L}\p{N} .'-]{2,80}$/u.test(collection) || !key) throw new Error('INVALID_CROSS_REQUEST');
@@ -10,7 +11,7 @@ export async function readCrossMarket(collection, key, fetcher = fetch, pause = 
     const url = new URL(`${BASE}/search/${market}/${encodeURIComponent(collection)}`);
     url.searchParams.set('backdrops', backdrop);
     if (model) url.searchParams.set('models', model);
-    const response = await fetcher(url, { method: 'GET', headers: { Authorization: `Token ${key}`, Accept: 'application/json' }, redirect: 'error', signal: AbortSignal.timeout(12000) });
+    const response = await fetchReadWithRetry(url, { method: 'GET', headers: { Authorization: `Token ${key}`, Accept: 'application/json' }, redirect: 'error' }, fetcher, pause);
     if (!response.ok) return { ok: false, market, status: response.status, rows, writesPerformed: 0 };
     const data = await response.json();
     if (!Array.isArray(data)) throw new Error('INVALID_CROSS_RESPONSE');

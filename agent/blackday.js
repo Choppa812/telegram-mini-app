@@ -1,4 +1,5 @@
 const BASE = 'https://gift-satellite.dev/api';
+import { fetchReadWithRetry } from './read-retry.js';
 
 export async function countBlackSales(collection, token, fetcher = fetch, now = new Date(), pause = ms => new Promise(resolve => setTimeout(resolve, ms))) {
   if (typeof collection !== 'string' || !/^[\p{L}\p{N} .'-]{2,80}$/u.test(collection) || !token) throw new Error('INVALID_BLACKDAY_REQUEST');
@@ -6,12 +7,12 @@ export async function countBlackSales(collection, token, fetcher = fetch, now = 
   let count = 0;
   for (let page = 0; page < 12; page++) {
     if (page) await pause(650);
-    const response = await fetcher(new URL(`${BASE}/history/${encodeURIComponent(collection)}`), {
+    const response = await fetchReadWithRetry(new URL(`${BASE}/history/${encodeURIComponent(collection)}`), {
       method: 'POST',
       headers: { Authorization: `Token ${token}`, Accept: 'application/json', 'Content-Type': 'application/json' },
       body: JSON.stringify({ page, pageSize:20, sortBy:'date', backdrops:['Black'] }),
-      redirect: 'error', signal: AbortSignal.timeout(12000),
-    });
+      redirect: 'error',
+    }, fetcher, pause);
     if (!response.ok) return { ok:false, collection, status:response.status };
     const data = await response.json();
     if (!Array.isArray(data?.content)) throw new Error('INVALID_HISTORY_RESPONSE');

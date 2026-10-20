@@ -1,4 +1,5 @@
 const BASE = 'https://gift-satellite.dev/api';
+import { fetchReadWithRetry } from './read-retry.js';
 const validName = value => typeof value === 'string' && /^[\p{L}\p{N} .!'-]{2,80}$/u.test(value);
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -9,12 +10,12 @@ async function history(collection, key, { model, backdrop, days, maxPages = 12, 
   let complete = false;
   for (let page = 0; page < maxPages; page++) {
     if (page) await pause(600);
-    const response = await fetcher(new URL(`${BASE}/history/${encodeURIComponent(collection)}`), {
+    const response = await fetchReadWithRetry(new URL(`${BASE}/history/${encodeURIComponent(collection)}`), {
       method: 'POST',
       headers: { Authorization: `Token ${key}`, Accept: 'application/json', 'Content-Type': 'application/json' },
       body: JSON.stringify({ page, pageSize: 20, sortBy: 'date', ...(model ? { models: [model] } : {}), ...(backdrop ? { backdrops: [backdrop] } : {}) }),
-      redirect: 'error', signal: AbortSignal.timeout(12000),
-    });
+      redirect: 'error',
+    }, fetcher, pause);
     if (!response.ok) return { ok: false, status: response.status };
     const data = await response.json();
     if (!Array.isArray(data?.content)) throw new Error('INVALID_VARIANT_HISTORY');

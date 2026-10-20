@@ -17,10 +17,10 @@ test('authorization failure is reported without market requests or exposing prov
   const result=await probeSatellite('secret',async()=>{calls++;return {ok:false,status:401};});
   assert.equal(result.ok,false); assert.equal(calls,1); assert.equal(result.attempts.length,1);
 });
-test('probe does not retry provider failures and blocks unsupported paths', async()=>{
+test('probe retries transient provider failures and blocks unsupported paths', async()=>{
   let calls=0;
   const result=await probeSatellite('secret',async()=>{calls++;return {ok:false,status:429};});
-  assert.equal(result.ok,false); assert.equal(calls,1);
+  assert.equal(result.ok,false); assert.equal(calls,3);
   await assert.rejects(readSatellite('/user/buy',{},'secret','token'),/UNSUPPORTED_READ_PATH/);
 });
 test('documented Token header is supported and error diagnostics redact the key', async()=>{

@@ -31,7 +31,7 @@ test('fails closed when a market rejects a request', async () => {
     calls++;
     return { ok: false, status: 429 };
   }, async () => {});
-  assert.equal(calls, 1);
+  assert.equal(calls, 3);
   assert.equal(result.ok, false);
   assert.match(crossMarketText(result), /HTTP 429/);
 });
