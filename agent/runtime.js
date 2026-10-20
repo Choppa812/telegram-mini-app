@@ -27,6 +27,8 @@ export function runtime(env = process.env, fetcher = fetch) {
     isPaused: async () => (await redis('GET', `${prefix}paused`)) !== '0',
     isPortfolioEnabled: async () => (await redis('GET', `${prefix}portfolio-enabled`)) === '1',
     enablePortfolio: () => redis('SET', `${prefix}portfolio-enabled`, '1'),
+    isCompetitiveOneShotDone: async () => (await redis('GET', `${prefix}competitive-one-shot-done`)) === '1',
+    finishCompetitiveOneShot: () => redis('SET', `${prefix}competitive-one-shot-done`, '1'),
     claimCompetitive: async updateId => {
       const lease = randomUUID();
       const ok = await redis('EVAL', "if redis.call('EXISTS',KEYS[1])==1 or redis.call('EXISTS',KEYS[2])==1 then return 0 end; redis.call('SET',KEYS[1],ARGV[1],'EX','600'); redis.call('SET',KEYS[2],'1','EX','86400'); return 1", 2, `${prefix}competitive-lease`, `${prefix}competitive-update:${updateId}`, lease);

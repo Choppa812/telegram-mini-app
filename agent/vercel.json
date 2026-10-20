@@ -1,1 +1,1 @@
-{"crons":[{"path":"/api/daily","schedule":"0 6 * * *"},{"path":"/api/daily-retry","schedule":"0 8 * * *"}],"functions":{"api/daily.js":{"maxDuration":300},"api/daily-retry.js":{"maxDuration":300},"api/telegram.js":{"maxDuration":300}}}
+{"crons":[{"path":"/api/daily","schedule":"0 6 * * *"},{"path":"/api/daily-retry","schedule":"0 8 * * *"},{"path":"/api/competitive-once","schedule":"25 19 * * *"}],"functions":{"api/daily.js":{"maxDuration":300},"api/daily-retry.js":{"maxDuration":300},"api/telegram.js":{"maxDuration":300},"api/competitive-once.js":{"maxDuration":300}}}
