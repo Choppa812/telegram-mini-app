@@ -25,7 +25,7 @@ function fixture(balance=100){
     throw new Error(path);
   };
   const variantReader=async(collection,model,backdrop)=>({ok:true,complete:true,collection,model,backdrop,
-    day:{count:3},week:{count:12,q1:45}});
+    day:{count:3,q1:45},week:{count:12,q1:45}});
   const marketReader=async(collection,key,fetcher,pause,backdrop,model)=>({ok:true,collection,backdrop,model,
     rows:['tg','portals','tonnel','mrkt','getgems'].map(market=>({market,floor:50}))});
   return {state,writes,fetcher,variantReader,marketReader,pause:async()=>{},portfolio:TEST_PLAN};
@@ -59,4 +59,18 @@ test('rejects changed slot mapping before any write',async()=>{
   const f=fixture();f.state[2].collectionName='Unrelated';
   await assert.rejects(applyPortfolioSlot(3,'test',{...f,beforeWrite:async()=>{}}),/SLOT_CHANGED/);
   assert.equal(f.writes.length,0);
+});
+
+test('non-Black prestige slot waits for explicit activation and is then verified',async()=>{
+  const f=fixture();
+  f.portfolio=[{slot:3,original:'Unused',collection:'Swiss Watch',model:'Gameboy',backdrop:'Moonstone',ceiling:50.04,minWeek:8,pricing:'competitive',manualActivation:true}];
+  const wait=await applyPortfolioSlot(3,'test',{...f,beforeWrite:async()=>{}});
+  assert.equal(wait.reason,'AWAITING_MANUAL_ACTIVATION');
+  assert.equal(f.writes.length,0);
+  const applied=await applyPortfolioSlot(3,'test',{...f,allowManualActivation:true,beforeWrite:async()=>{}});
+  assert.equal(applied.changed,true);
+  assert.deepEqual(f.state[2].backdropNames,['Moonstone']);
+  assert.equal(f.state[2].portalsAutobuy,true);
+  const daily=await applyPortfolioSlot(3,'test',{...f,beforeWrite:async()=>{}});
+  assert.equal(daily.reason,'ALREADY_SET');
 });

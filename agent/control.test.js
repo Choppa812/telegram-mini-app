@@ -56,6 +56,18 @@ test('competitive command is owner-only and checks pause before each provider wr
   await handleCommand(update(3,'/applycompetitive'),deps);
   assert.equal(calls,1);
 });
+test('prestige activation is owner-only, pause-guarded and reports verified writes',async()=>{
+  const s=setup();let calls=0;
+  const deps={...s,applyPrestige:async({beforeWrite})=>{calls++;await beforeWrite();return {checked:2,changed:2,skipped:0,details:['watch','bracelet']};}};
+  await handleCommand(update(1,'/applyprestige',7),deps);
+  await handleCommand(update(2,'/applyprestige'),deps);
+  assert.equal(calls,0);
+  s.state.paused=false;
+  await handleCommand(update(3,'/applyprestige'),deps);
+  assert.equal(calls,1);
+  assert.equal(s.state.report.changed,2);
+  assert.match(s.messages.at(-1),/Каждая запись проверена/);
+});
 test('manual API check is owner-only, read-only, and does not resume paused automation', async () => {
   const s=setup();let calls=0;
   const deps={...s,checkApi:async()=>{calls++;return {ok:false,attempts:[{mode:'authorization',status:401}]};}};

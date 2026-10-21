@@ -27,13 +27,20 @@ export function reportText(report) {
   ].filter(Boolean).join('\n');
 }
 
-export async function handleCommand(update, { ownerId, store, send, checkApi, marketOverview, floorOverview, highBlackFloors, inspectGift, feeOverview, turnoverOverview, blackDailySales, blackScan, positionsOverview, blackModels, modelMarkets, crossMarket, variantLeads, variantDetail, variantCross, applyBlack, apply28, applyCompetitive, cleanBlack }) {
+export async function handleCommand(update, { ownerId, store, send, checkApi, marketOverview, floorOverview, highBlackFloors, inspectGift, feeOverview, turnoverOverview, blackDailySales, blackScan, positionsOverview, blackModels, modelMarkets, crossMarket, variantLeads, variantDetail, variantCross, applyBlack, apply28, applyCompetitive, applyPrestige, cleanBlack }) {
   const m = update?.message;
   if (!ownerId || m?.chat?.type !== 'private' || String(m?.from?.id) !== String(ownerId) || String(m?.chat?.id) !== String(ownerId)) return false;
   const command = (m.text || '').trim().split(/\s/)[0].split('@')[0].toLowerCase();
-  if (!['/start', '/help', '/status', '/report', '/pause', '/resume', '/checkapi', '/market', '/floors', '/highfloors', '/inspect', '/fees', '/rank', '/blackday', '/blackscan', '/blackscan90', '/positions', '/models', '/marketsales', '/cross', '/variants', '/variant', '/variantcross', '/applyblack', '/apply28', '/applycompetitive', '/blackclean'].includes(command)) return false;
+  if (!['/start', '/help', '/status', '/report', '/pause', '/resume', '/checkapi', '/market', '/floors', '/highfloors', '/inspect', '/fees', '/rank', '/blackday', '/blackscan', '/blackscan90', '/positions', '/models', '/marketsales', '/cross', '/variants', '/variant', '/variantcross', '/applyblack', '/apply28', '/applycompetitive', '/applyprestige', '/blackclean'].includes(command)) return false;
   if (!Number.isSafeInteger(update.update_id)) return false;
-  if (command === '/applycompetitive') {
+  if (command === '/applyprestige') {
+    if(await store.isPaused())await send('Автонастройка на паузе. Для изменения слотов сначала /resume.');
+    else try {
+      const result=await applyPrestige({beforeWrite:async()=>{if(await store.isPaused())throw new Error('AUTOMATION_PAUSED');}});
+      await store.saveReport({date:new Date().toISOString(),status:'completed',checked:result.checked,changed:result.changed,skipped:result.skipped,details:result.details});
+      await send(`Престижные модели: изменено ${result.changed}, без изменений ${result.skipped}.\n${result.details.join('\n')}\nКаждая запись проверена повторным чтением API.`);
+    } catch(error){await send(`Настройка престижных моделей прервана: ${String(error?.message||'ERROR').replace(/[^\p{L}\p{N}_ .,;:()\[\]-]/gu,'').slice(0,150)}. Проверьте /positions.`);}
+  } else if (command === '/applycompetitive') {
     if(await store.isPaused())await send('Автонастройка на паузе. Для изменения слотов сначала /resume.');
     else {
       const lease=await store.claimCompetitive?.(update.update_id);
