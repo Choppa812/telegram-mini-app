@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readMarketOverview, summarizeRecentOffers, marketOverviewText, readFloorOverview, floorOverviewText } from './market.js';
+import { readMarketOverview, summarizeRecentOffers, marketOverviewText, readFloorOverview, floorOverviewText, readHighBlackFloors, highBlackFloorsText } from './market.js';
 
 test('recent-offer overview excludes stale and malformed candidates without presenting them as floors', () => {
   const now = new Date('2026-10-11T15:00:00Z');
@@ -34,6 +34,17 @@ test('floor overview combines Portals and MRKT and keeps Black distinct', async(
   assert.equal(result.under50Black,1);
   assert.deepEqual(result.candidates,[{collection:'A',base:19,black:28}]);
   assert.match(floorOverviewText(result),/Black 28\.00, общий 19\.00/);
+  assert.ok(!JSON.stringify(result).includes('secret'));
+});
+
+test('high Black floors use the lower market price and exclude cheaper collections', async () => {
+  const result = await readHighBlackFloors('secret', async (url, options) => {
+    assert.equal(options.headers.Authorization, 'Token secret');
+    const data = String(url).includes('market=mrkt') ? { A: 60, B: 50, C: 90 } : { A: 48, B: 55, C: 70 };
+    return { ok: true, status: 200, json: async () => data };
+  }, async () => {});
+  assert.deepEqual(result.rows, [{ collection: 'B', floor: 50 }, { collection: 'C', floor: 70 }]);
+  assert.match(highBlackFloorsText(result), /Black от 50 TON/);
   assert.ok(!JSON.stringify(result).includes('secret'));
 });
 

@@ -61,3 +61,24 @@ export function floorOverviewText(result) {
   const lines = result.candidates.map(row=>`${row.collection}: Black ${row.black.toFixed(2)}, общий ${row.base?.toFixed(2) ?? '—'} TON`);
   return [`Gift Satellite — минимальные цены Portals/MRKT`, `Коллекций: ${result.baseCount}; с Black: ${result.blackCount}; Black до 50 TON: ${result.under50Black}.`,...lines,'Это показания API, перед установкой лимита нужны проверка листингов и продаж. Слоты не менялись.'].join('\n');
 }
+
+export async function readHighBlackFloors(key, fetcher = fetch, pause = ms => new Promise(resolve => setTimeout(resolve, ms))) {
+  const datasets = [];
+  for (const market of ['portals', 'mrkt']) {
+    const result = await readSatellite('/history/floors', { market, black: true }, key, 'token', fetcher);
+    if (!result.ok || !result.data || typeof result.data !== 'object' || Array.isArray(result.data)) return { ok: false, market, status: result.status };
+    datasets.push(result.data);
+    await pause(550);
+  }
+  const names = new Set(datasets.flatMap(data => Object.keys(data)));
+  const rows = [...names].map(collection => {
+    const prices = datasets.map(data => Number(data[collection])).filter(price => Number.isFinite(price) && price > 0);
+    return { collection, floor: prices.length ? Math.min(...prices) : null };
+  }).filter(row => row.floor !== null && row.floor >= 50).sort((a, b) => a.floor - b.floor);
+  return { ok: true, rows };
+}
+
+export function highBlackFloorsText(result) {
+  if (!result?.ok) return `Флоры Black от 50 TON недоступны: ${result?.market || '?'} HTTP ${result?.status ?? '?'}. Слоты не менялись.`;
+  return [`Gift Satellite — Black от 50 TON, Portals/MRKT; коллекций ${result.rows.length}.`, ...result.rows.map(row => `${row.collection}: ${row.floor.toFixed(2)} TON`), 'Это флор коллекции, а не конкретной модели. Слоты не менялись.'].join('\n');
+}

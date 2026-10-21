@@ -27,11 +27,11 @@ export function reportText(report) {
   ].filter(Boolean).join('\n');
 }
 
-export async function handleCommand(update, { ownerId, store, send, checkApi, marketOverview, floorOverview, inspectGift, feeOverview, turnoverOverview, blackDailySales, blackScan, positionsOverview, blackModels, modelMarkets, crossMarket, variantLeads, variantDetail, variantCross, applyBlack, apply28, applyCompetitive, cleanBlack }) {
+export async function handleCommand(update, { ownerId, store, send, checkApi, marketOverview, floorOverview, highBlackFloors, inspectGift, feeOverview, turnoverOverview, blackDailySales, blackScan, positionsOverview, blackModels, modelMarkets, crossMarket, variantLeads, variantDetail, variantCross, applyBlack, apply28, applyCompetitive, cleanBlack }) {
   const m = update?.message;
   if (!ownerId || m?.chat?.type !== 'private' || String(m?.from?.id) !== String(ownerId) || String(m?.chat?.id) !== String(ownerId)) return false;
   const command = (m.text || '').trim().split(/\s/)[0].split('@')[0].toLowerCase();
-  if (!['/start', '/help', '/status', '/report', '/pause', '/resume', '/checkapi', '/market', '/floors', '/inspect', '/fees', '/rank', '/blackday', '/blackscan', '/blackscan90', '/positions', '/models', '/marketsales', '/cross', '/variants', '/variant', '/variantcross', '/applyblack', '/apply28', '/applycompetitive', '/blackclean'].includes(command)) return false;
+  if (!['/start', '/help', '/status', '/report', '/pause', '/resume', '/checkapi', '/market', '/floors', '/highfloors', '/inspect', '/fees', '/rank', '/blackday', '/blackscan', '/blackscan90', '/positions', '/models', '/marketsales', '/cross', '/variants', '/variant', '/variantcross', '/applyblack', '/apply28', '/applycompetitive', '/blackclean'].includes(command)) return false;
   if (!Number.isSafeInteger(update.update_id)) return false;
   if (command === '/applycompetitive') {
     if(await store.isPaused())await send('Автонастройка на паузе. Для изменения слотов сначала /resume.');
@@ -76,6 +76,9 @@ export async function handleCommand(update, { ownerId, store, send, checkApi, ma
     const filter=(m.text||'').trim().replace(/^\S+\s*/,'').trim();
     try { await send(await positionsOverview(filter)); }
     catch { await send('Текущие слоты не удалось прочитать.'); }
+  } else if (command === '/highfloors') {
+    try { await send(await highBlackFloors()); }
+    catch { await send('Флоры Black от 50 TON не удалось прочитать. Слоты не менялись.'); }
   } else if (command === '/variants') {
     const collection=(m.text||'').trim().replace(/^\S+\s*/,'').trim();
     if(!collection)await send('Укажите коллекцию: /variants Pool Float');
