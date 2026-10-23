@@ -4,6 +4,16 @@ import { readCrossMarket } from './cross.js';
 import { subscriptionBody, writeSubscription } from './trading.js';
 import { competitivePrice } from './competitive.js';
 
+export const BASE_PORTFOLIO = [
+  {slot:1,original:'Xmas Stocking',collection:'Xmas Stocking',model:'Bloody',ceiling:19.89,minWeek:8},
+  {slot:11,original:'Pool Float',collection:'Pool Float',model:'Sebastian',ceiling:20.09,minWeek:8},
+  {slot:12,original:'Vice Cream',collection:'Vice Cream',model:'Bamboo Ice',ceiling:19.12,minWeek:8},
+  {slot:14,original:'Lol Pop',collection:'Lol Pop',model:'Choco Pop',ceiling:22.12,minWeek:8},
+  {slot:15,original:'Instant Ramen',collection:'Instant Ramen',model:'Sacred Grove',ceiling:19.17,minWeek:8},
+  {slot:26,original:'Chill Flame',collection:'Chill Flame',model:'Lava Lamp',ceiling:20.39,minWeek:8},
+  {slot:27,original:'B-Day Candle',collection:'Fresh Socks',model:'Brothers',ceiling:21.40,minWeek:8},
+].map(row=>({...row,backdrop:'Black',pricing:'competitive'}));
+
 // The user's slot assignments and trading limits are stored only in a private
 // Vercel environment variable, never in the public repository.
 export function loadPortfolio(raw=process.env.PRIVATE_PORTFOLIO_PLAN) {
@@ -27,6 +37,16 @@ export function loadPortfolio(raw=process.env.PRIVATE_PORTFOLIO_PLAN) {
 
 const roundDown = number => Math.floor((number + 1e-9) * 100) / 100;
 const same = (a,b) => JSON.stringify(a) === JSON.stringify(b);
+// The owner approved this one active order replacement. Keep every other
+// active order protected, and refuse the replacement if its old state drifts.
+function approvedSlotThreeReplacement(number, slot, plan) {
+  return number===3 && plan.original==='Input Key' && plan.previousModel==='V For Vegan' &&
+    plan.collection==='Vice Cream' && plan.model==='Sushi' && (plan.backdrop||'Black')==='Black' &&
+    plan.ceiling<=19.08 && slot?.collectionName==='Input Key' &&
+    same(slot.modelNames,['V For Vegan']) && same(slot.backdropNames,['Black']) &&
+    slot.portalsAutobuy===true && slot.portalsAutobuyQuantity===1 &&
+    Math.abs(Number(slot.portalsAutobuyMaxPrice)-37.28)<.001;
+}
 
 export async function applyPortfolioSlot(slotNumber, key, {
   beforeWrite, fetcher=fetch, pause=ms=>new Promise(resolve=>setTimeout(resolve,ms)),
@@ -46,8 +66,9 @@ export async function applyPortfolioSlot(slotNumber, key, {
   const previous=slot?.collectionName===plan.original&&(!plan.previousModel||same(slot.modelNames,[plan.previousModel]));
   if(!slot||!planned&&!previous)throw new Error('SLOT_CHANGED');
   if(plan.manualActivation&&!planned&&!allowManualActivation)return {slot:slotNumber,changed:false,reason:'AWAITING_MANUAL_ACTIVATION'};
-  if(slot.portalsAutobuy===true&&slot.collectionName!==plan.collection)throw new Error('SLOT_ALREADY_ACTIVE');
-  if(slot.portalsAutobuy===true&&!same(slot.modelNames,[plan.model]))throw new Error('ACTIVE_MODELS_CHANGED');
+  const approvedReplacement=approvedSlotThreeReplacement(slotNumber,slot,plan);
+  if(slot.portalsAutobuy===true&&slot.collectionName!==plan.collection&&!approvedReplacement)throw new Error('SLOT_ALREADY_ACTIVE');
+  if(slot.portalsAutobuy===true&&!same(slot.modelNames,[plan.model])&&!approvedReplacement)throw new Error('ACTIVE_MODELS_CHANGED');
   if(slot.portalsAutobuyQuantity>1)throw new Error('SLOT_QUANTITY_CHANGED');
   const history=await variantReader(plan.collection,plan.model,backdrop,key,{fetcher,pause});
   if(!history?.ok||!history.complete)throw new Error('EXACT_SALES_UNAVAILABLE');
@@ -83,7 +104,11 @@ export async function applyPortfolioSlot(slotNumber, key, {
   ]);
   if(!latestSlots.ok||!Array.isArray(latestSlots.data)||!latestProfile.ok)throw new Error('ACCOUNT_REREAD_FAILED');
   const current=latestSlots.data[slotNumber-1],balance=Number(latestProfile.data?.tonBalance);
-  if(!current||current._id!==slot._id||current.collectionName!==slot.collectionName||current.portalsAutobuy!==slot.portalsAutobuy)throw new Error('SLOT_CHANGED_DURING_ANALYSIS');
+  if(!current||current._id!==slot._id||current.collectionName!==slot.collectionName||current.portalsAutobuy!==slot.portalsAutobuy||
+     !same(current.modelNames,slot.modelNames)||!same(current.backdropNames,slot.backdropNames)||
+     current.portalsAutobuyQuantity!==slot.portalsAutobuyQuantity||
+     Math.abs(Number(current.portalsAutobuyMaxPrice)-Number(slot.portalsAutobuyMaxPrice))>.001||
+     (approvedReplacement&&!approvedSlotThreeReplacement(slotNumber,current,plan)))throw new Error('SLOT_CHANGED_DURING_ANALYSIS');
   if(!Number.isFinite(balance))throw new Error('INVALID_BALANCE');
   if(balance<price*1.03)return {slot:slotNumber,changed:false,reason:'BALANCE_INSUFFICIENT_FOR_SINGLE_PURCHASE'};
   const body=subscriptionBody(current,{models:[plan.model]},price);
@@ -121,6 +146,10 @@ export async function applyPortfolio(key, options={}) {
     if (options.onProgress) await options.onProgress({ ...result, details:[...result.details] });
   }
   return result;
+}
+
+export async function applyBasePortfolio(key, options={}) {
+  return applyPortfolio(key,{...options,portfolio:BASE_PORTFOLIO});
 }
 
 export async function applyPrestige(key, options={}) {

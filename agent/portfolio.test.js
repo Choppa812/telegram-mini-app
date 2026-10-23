@@ -1,8 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyPortfolioSlot } from './portfolio.js';
+import { applyPortfolioSlot, BASE_PORTFOLIO } from './portfolio.js';
 
 const TEST_PLAN=[{slot:3,original:'Unused',collection:'Example Gift',model:'Example Model',ceiling:10,minWeek:8}];
+
+test('base targets bind seven distinct existing slots to one exact Black model',()=>{
+  assert.deepEqual(BASE_PORTFOLIO.map(row=>row.slot).sort((a,b)=>a-b),[1,11,12,14,15,26,27]);
+  assert.ok(BASE_PORTFOLIO.every(row=>row.backdrop==='Black'&&row.ceiling>0&&row.model));
+});
 
 const reply=data=>({ok:true,status:200,json:async()=>data});
 const slot=(index,collection)=>({
@@ -59,6 +64,34 @@ test('rejects changed slot mapping before any write',async()=>{
   const f=fixture();f.state[2].collectionName='Unrelated';
   await assert.rejects(applyPortfolioSlot(3,'test',{...f,beforeWrite:async()=>{}}),/SLOT_CHANGED/);
   assert.equal(f.writes.length,0);
+});
+
+test('replaces only the specifically approved active slot 3 state',async()=>{
+  const f=fixture();
+  const old=f.state[2];
+  Object.assign(old,{collectionName:'Input Key',modelNames:['V For Vegan'],backdropNames:['Black'],
+    portalsAutobuy:true,portalsAutobuyQuantity:1,portalsAutobuyMaxPrice:37.28});
+  f.portfolio=[{slot:3,original:'Input Key',previousModel:'V For Vegan',collection:'Vice Cream',
+    model:'Sushi',backdrop:'Black',ceiling:19.08,minWeek:8,pricing:'competitive'}];
+  const done=await applyPortfolioSlot(3,'test',{...f,beforeWrite:async()=>{}});
+  assert.equal(done.changed,true);
+  assert.equal(f.state[2].collectionName,'Vice Cream');
+  assert.deepEqual(f.state[2].modelNames,['Sushi']);
+  assert.ok(done.price<=19.08);
+  assert.equal(f.writes.length,1);
+});
+
+test('refuses active replacement if the old price changed or a different slot is selected',async()=>{
+  for(const number of [3,4]){
+    const f=fixture();
+    const old=f.state[number-1];
+    Object.assign(old,{collectionName:'Input Key',modelNames:['V For Vegan'],backdropNames:['Black'],
+      portalsAutobuy:true,portalsAutobuyQuantity:1,portalsAutobuyMaxPrice:number===3?37.27:37.28});
+    f.portfolio=[{slot:number,original:'Input Key',previousModel:'V For Vegan',collection:'Vice Cream',
+      model:'Sushi',backdrop:'Black',ceiling:19.08,minWeek:8,pricing:'competitive'}];
+    await assert.rejects(applyPortfolioSlot(number,'test',{...f,beforeWrite:async()=>{}}),/SLOT_ALREADY_ACTIVE/);
+    assert.equal(f.writes.length,0);
+  }
 });
 
 test('non-Black prestige slot waits for explicit activation and is then verified',async()=>{
