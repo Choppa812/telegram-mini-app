@@ -27,11 +27,11 @@ export function reportText(report) {
   ].filter(Boolean).join('\n');
 }
 
-export async function handleCommand(update, { ownerId, store, send, checkApi, marketOverview, floorOverview, highBlackFloors, inspectGift, feeOverview, turnoverOverview, blackDailySales, blackScan, positionsOverview, blackModels, modelMarkets, crossMarket, variantLeads, variantDetail, variantCross, applyBlack, apply28, applyCompetitive, applyPrestige, cleanBlack }) {
+export async function handleCommand(update, { ownerId, store, send, checkApi, marketOverview, floorOverview, highBlackFloors, inspectGift, feeOverview, turnoverOverview, blackDailySales, blackScan, positionsOverview, blackModels, modelMarkets, crossMarket, variantLeads, variantDetail, variantCross, applyBlack, apply28, applyAll, applyCompetitive, applyPrestige, cleanBlack }) {
   const m = update?.message;
   if (!ownerId || m?.chat?.type !== 'private' || String(m?.from?.id) !== String(ownerId) || String(m?.chat?.id) !== String(ownerId)) return false;
   const command = (m.text || '').trim().split(/\s/)[0].split('@')[0].toLowerCase();
-  if (!['/start', '/help', '/status', '/report', '/pause', '/resume', '/checkapi', '/market', '/floors', '/highfloors', '/inspect', '/fees', '/rank', '/blackday', '/blackscan', '/blackscan90', '/positions', '/models', '/marketsales', '/cross', '/variants', '/variant', '/variantcross', '/applyblack', '/apply28', '/applycompetitive', '/applyprestige', '/blackclean'].includes(command)) return false;
+  if (!['/start', '/help', '/status', '/report', '/pause', '/resume', '/checkapi', '/market', '/floors', '/highfloors', '/inspect', '/fees', '/rank', '/blackday', '/blackscan', '/blackscan90', '/positions', '/models', '/marketsales', '/cross', '/variants', '/variant', '/variantcross', '/applyblack', '/apply28', '/applyall', '/applycompetitive', '/applyprestige', '/blackclean'].includes(command)) return false;
   if (!Number.isSafeInteger(update.update_id)) return false;
   if (command === '/applyprestige') {
     if(await store.isPaused())await send('Автонастройка на паузе. Для изменения слотов сначала /resume.');
@@ -51,6 +51,26 @@ export async function handleCommand(update, { ownerId, store, send, checkApi, ma
         await send(`Точные модели Black: изменено ${result.changed}, без изменений ${result.skipped}.\n${result.details.join('\n')}\nКаждая запись проверена повторным чтением API.`);
       } catch(error){await send(`Настройка точных моделей прервана: ${String(error?.message||'ERROR').replace(/[^\p{L}\p{N}_ .,;:()\[\]-]/gu,'').slice(0,150)}. Проверьте /positions.`);}
       finally {if(lease)await store.releaseCompetitive(lease);}
+    }
+  } else if (command === '/applyall') {
+    if(await store.isPaused())await send('Автонастройка на паузе. Для изменения слотов сначала /resume.');
+    else {
+      const lease=await store.claimFullPortfolio?.(update.update_id);
+      if(store.claimFullPortfolio&&!lease)return true;
+      let progress={checked:0,changed:0,skipped:0,details:[]};
+      try {
+        const result=await applyAll({
+          beforeWrite:async()=>{if(await store.isPaused())throw new Error('AUTOMATION_PAUSED');},
+          onProgress:async state=>{progress=state;await store.saveReport({date:new Date().toISOString(),status:'in_progress',...state});},
+        });
+        await store.enablePortfolio();
+        await store.saveReport({date:new Date().toISOString(),status:'completed',...result});
+        await send(`Black — проверены все 28 слотов: изменено ${result.changed}, пропущено ${result.skipped}.\n${result.details.join('\n')}\nИзменения подтверждены повторным чтением API.`);
+      } catch(error){
+        const reason=safeFailureCode(error);
+        await store.saveReport({date:new Date().toISOString(),status:'error',...progress,reason});
+        await send(`Black — настройка 28 прервана после ${progress.checked} слотов; подтверждено изменений: ${progress.changed}. Причина: ${reason}. Проверьте /report и /positions.`);
+      } finally {if(lease)await store.releaseFullPortfolio(lease);}
     }
   } else if (command === '/apply28') {
     const batch=Number((m.text||'').trim().replace(/^\S+\s*/,'').trim());

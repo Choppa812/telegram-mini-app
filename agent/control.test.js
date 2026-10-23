@@ -40,6 +40,26 @@ test('portfolio activation is owner-only, pause-guarded and enables daily work a
   assert.equal(calls,1);assert.equal(enabled,true);
   assert.equal(s.state.report.changed,3);
 });
+test('full portfolio command is owner-only, replay-safe and records verified progress',async()=>{
+  const s=setup();let calls=0,enabled=false,released=false;
+  s.store.claimFullPortfolio=async()=>calls===0?'lease':null;
+  s.store.releaseFullPortfolio=async lease=>{assert.equal(lease,'lease');released=true;};
+  s.store.enablePortfolio=async()=>{enabled=true;};
+  const deps={...s,applyAll:async({beforeWrite,onProgress})=>{
+    calls++;await beforeWrite();
+    await onProgress({checked:1,changed:1,skipped:0,details:['#1 verified']});
+    return {checked:28,changed:24,skipped:4,details:['#1 verified']};
+  }};
+  await handleCommand(update(1,'/applyall',7),deps);
+  await handleCommand(update(2,'/applyall'),deps);
+  assert.equal(calls,0);
+  s.state.paused=false;
+  await handleCommand(update(3,'/applyall'),deps);
+  assert.equal(calls,1);assert.equal(enabled,true);assert.equal(released,true);
+  assert.equal(s.state.report.checked,28);
+  await handleCommand(update(3,'/applyall'),deps);
+  assert.equal(calls,1);
+});
 test('competitive command is owner-only and checks pause before each provider write',async()=>{
   const s=setup();let calls=0;
   let leaseCount=0;

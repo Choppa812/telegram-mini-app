@@ -152,6 +152,14 @@ export async function applyBasePortfolio(key, options={}) {
   return applyPortfolio(key,{...options,portfolio:BASE_PORTFOLIO});
 }
 
+export async function applyFullPortfolio(key, options={}) {
+  const privateRows=loadPortfolio();
+  const portfolio=[...BASE_PORTFOLIO,...privateRows].sort((a,b)=>a.slot-b.slot);
+  if(portfolio.length!==28||new Set(portfolio.map(row=>row.slot)).size!==28)
+    throw new Error('INVALID_PRIVATE_PORTFOLIO_PLAN');
+  return applyPortfolio(key,{...options,portfolio});
+}
+
 export async function applyPrestige(key, options={}) {
   const portfolio=options.portfolio||loadPortfolio();
   const targets=[
