@@ -107,3 +107,5 @@ test('non-Black prestige slot waits for explicit activation and is then verified
   const daily=await applyPortfolioSlot(3,'test',{...f,beforeWrite:async()=>{}});
   assert.equal(daily.reason,'ALREADY_SET');
 });
+
+test('retains slot identity when provider reorders subscriptions',async()=>{const f=fixture();Object.assign(f.state[2],{collectionName:'Example Gift',modelNames:['Example Model'],backdropNames:['Black']});[f.state[0],f.state[2]]=[f.state[2],f.state[0]];await applyPortfolioSlot(3,'test',{...f,beforeWrite:async()=>{f.state.reverse();}});assert.equal(f.writes.length,1);assert.equal(f.state.find(s=>s._id==='000000000000000000000003').portalsAutobuy,true);});

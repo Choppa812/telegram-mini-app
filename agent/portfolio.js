@@ -61,7 +61,9 @@ export async function applyPortfolioSlot(slotNumber, key, {
   ]);
   if(!slotsResponse.ok||!Array.isArray(slotsResponse.data)||!profileResponse.ok)throw new Error('ACCOUNT_READ_FAILED');
   if(profileResponse.data?.isAutobuyEnabled!==true)throw new Error('GLOBAL_AUTOBUY_DISABLED');
-  const slot=slotsResponse.data[slotNumber-1];
+  const exactMatches=slotsResponse.data.filter(item=>item.collectionName===plan.collection&&same(item.modelNames,[plan.model])&&same(item.backdropNames,[backdrop]));
+  if(exactMatches.length>1)throw new Error('SLOT_CHANGED');
+  const slot=exactMatches[0]||slotsResponse.data[slotNumber-1];
   const planned=slot?.collectionName===plan.collection&&same(slot.modelNames,[plan.model])&&same(slot.backdropNames,[backdrop]);
   const previous=slot?.collectionName===plan.original&&(!plan.previousModel||same(slot.modelNames,[plan.previousModel]));
   if(!slot||!planned&&!previous)throw new Error('SLOT_CHANGED');
@@ -78,7 +80,7 @@ export async function applyPortfolioSlot(slotNumber, key, {
     const body=subscriptionBody(slot,{models:[plan.model]},slot.portalsAutobuyMaxPrice);
     Object.assign(body,{backdropNames:[backdrop],portalsAutobuy:false,portalsAutobuyQuantity:0,autobuyTg:false,autobuyPortals:false,autobuyTonnel:false,autobuyMrkt:false});
     const latest=await readSatellite('/user/subscriptions',{},key,'token',fetcher);
-    const current=latest.ok&&Array.isArray(latest.data)?latest.data[slotNumber-1]:null;
+    const current=latest.ok&&Array.isArray(latest.data)?latest.data.find(item=>item._id===slot._id):null;
     if(!current||current._id!==slot._id||current.portalsAutobuy!==true||!same(current.modelNames,[plan.model]))throw new Error('SLOT_CHANGED_DURING_ANALYSIS');
     await beforeWrite();
     await writeSubscription(slot._id,body,key,fetcher);
@@ -103,7 +105,7 @@ export async function applyPortfolioSlot(slotNumber, key, {
     readSatellite('/user/me',{},key,'token',fetcher),
   ]);
   if(!latestSlots.ok||!Array.isArray(latestSlots.data)||!latestProfile.ok)throw new Error('ACCOUNT_REREAD_FAILED');
-  const current=latestSlots.data[slotNumber-1],balance=Number(latestProfile.data?.tonBalance);
+  const current=latestSlots.data.find(item=>item._id===slot._id),balance=Number(latestProfile.data?.tonBalance);
   if(!current||current._id!==slot._id||current.collectionName!==slot.collectionName||current.portalsAutobuy!==slot.portalsAutobuy||
      !same(current.modelNames,slot.modelNames)||!same(current.backdropNames,slot.backdropNames)||
      current.portalsAutobuyQuantity!==slot.portalsAutobuyQuantity||
