@@ -49,3 +49,5 @@ test('exact variant search filters the API request and excludes other models', a
   assert.equal(urls[0].searchParams.get('backdrops'), 'Gunmetal');
   assert.deepEqual(result.rows.map(row => row.floor), [7, 7, 7, 7, 7]);
 });
+
+test('reports failing market without exposing provider errors or key',async()=>{const r=await readCrossMarket('Chill Flame','secret',async()=>{throw new Error('secret provider details');},async()=>{});assert.equal(r.reason,'NETWORK_OR_TIMEOUT');assert.equal(r.market,'tg');assert.doesNotMatch(crossMarketText(r),/secret|provider details/);});
