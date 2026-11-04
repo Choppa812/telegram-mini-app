@@ -12,7 +12,9 @@ export default async function handler(req,res){
   let run=await store.getCatalogRun();
   if(!body.run){
     if(run?.status==='running')return res.status(202).json({status:'already_running'});
-    run={id:randomUUID(),status:'running',index:0,startedAt:Date.now(),checked:0,incomplete:0};
+    run=run?.status==='error'&&Number.isInteger(run.index)&&run.index>=0
+      ? {...run,id:randomUUID(),status:'running',resumedAt:Date.now()}
+      : {id:randomUUID(),status:'running',index:0,startedAt:Date.now(),checked:0,incomplete:0};
     await store.saveCatalogRun(run);
   }else if(!run||run.id!==body.run||run.status!=='running'||run.index!==body.index)return res.status(409).end();
   if(!await store.claimCatalogStep(run.id,run.index))return res.status(202).json({status:'duplicate'});
@@ -38,11 +40,12 @@ export default async function handler(req,res){
       else{
         const next=await fetch(URL,{method:'POST',headers:{Authorization:'Bearer '+process.env.CRON_SECRET,'Content-Type':'application/json'},
           body:JSON.stringify({run:run.id,index:run.index}),signal:AbortSignal.timeout(15000)});
-        if(!next.ok)throw new Error('CONTINUATION_FAILED');
+        if(!next.ok)throw new Error('CONTINUATION_HTTP_'+next.status);
       }
-    }catch{
+    }catch(error){
+      run.reason=/^CONTINUATION_HTTP_\d{3}$/.test(error.message)?error.message:'SCAN_STEP_FAILED';
       run.status='error';await store.saveCatalogRun(run);
-      await send(`Сбор каталога остановлен: обработано ${run.checked}, следующий индекс ${run.index}. Слоты не менялись.`);
+      await send(`Сбор каталога остановлен: обработано ${run.checked}, следующий индекс ${run.index}. Причина: ${run.reason}. /catalogall продолжит с сохранённого места. Слоты не менялись.`);
     }
   })());
   return res.status(202).json({status:'running'});
