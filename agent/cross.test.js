@@ -31,9 +31,9 @@ test('fails closed when a market rejects a request', async () => {
     calls++;
     return { ok: false, status: 429 };
   }, async () => {});
-  assert.equal(calls, 3);
+  assert.equal(calls, 15);
   assert.equal(result.ok, false);
-  assert.match(crossMarketText(result), /HTTP 429/);
+  assert.match(crossMarketText(result), /HTTP_429/);
 });
 
 test('exact variant search filters the API request and excludes other models', async () => {
@@ -50,4 +50,4 @@ test('exact variant search filters the API request and excludes other models', a
   assert.deepEqual(result.rows.map(row => row.floor), [7, 7, 7, 7, 7]);
 });
 
-test('reports failing market without exposing provider errors or key',async()=>{const r=await readCrossMarket('Chill Flame','secret',async()=>{throw new Error('secret provider details');},async()=>{});assert.equal(r.reason,'NETWORK_OR_TIMEOUT');assert.equal(r.market,'tg');assert.doesNotMatch(crossMarketText(r),/secret|provider details/);});
+test('reports failing market without exposing provider errors or key',async()=>{const r=await readCrossMarket('Chill Flame','secret',async()=>{throw new Error('secret provider details');},async()=>{});assert.equal(r.rows[0].error,'NETWORK_OR_TIMEOUT');assert.equal(r.rows[0].market,'tg');assert.doesNotMatch(crossMarketText(r),/secret|provider details/);});

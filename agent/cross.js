@@ -15,23 +15,24 @@ export async function readCrossMarket(collection, key, fetcher = fetch, pause = 
     try {
       response = await fetchReadWithRetry(url, { method: 'GET', headers: { Authorization: `Token ${key}`, Accept: 'application/json' }, redirect: 'error' }, fetcher, pause);
     } catch {
-      return { ok: false, market, reason: 'NETWORK_OR_TIMEOUT', rows, writesPerformed: 0 };
+      rows.push({market,error:'NETWORK_OR_TIMEOUT'}); continue;
     }
-    if (!response.ok) return { ok: false, market, status: response.status, rows, writesPerformed: 0 };
+    if (!response.ok) { rows.push({market,error:'HTTP_'+response.status}); continue; }
     let data;
     try { data = await response.json(); } catch {
-      return { ok: false, market, reason: 'INVALID_JSON', rows, writesPerformed: 0 };
+      rows.push({market,error:'INVALID_JSON'}); continue;
     }
-    if (!Array.isArray(data)) return { ok: false, market, reason: 'INVALID_RESPONSE_SHAPE', rows, writesPerformed: 0 };
+    if (!Array.isArray(data)) { rows.push({market,error:'INVALID_RESPONSE_SHAPE'}); continue; }
     const listings = data.filter(item => item?.backdropName === backdrop && (!model || item?.modelName === model) && (!item.currency || item.currency === 'ton') && Number.isFinite(Number(item.normalizedPrice)) && Number(item.normalizedPrice) > 0)
       .map(item => ({ model: item.modelName, price: Number(item.normalizedPrice) })).sort((a, b) => a.price - b.price);
     rows.push({ market, count: listings.length, floor: listings[0]?.price ?? null, fifth: listings[4]?.price ?? null, listings });
     await pause(market === 'tg' ? 1500 : 550);
   }
-  return { ok: true, collection, backdrop, model, rows, writesPerformed: 0 };
+  return { ok: rows.every(row=>!row.error), collection, backdrop, model, rows, writesPerformed: 0 };
 }
 
 export function crossMarketText(result, models = []) {
+  if (!result?.ok && result?.rows?.length===5) return ["Проверка цен неполная — автопокупка не менялась.",...result.rows.map(row=>row.error ? `${row.market}: ${row.error}` : `${row.market}: ${row.floor ?? "нет предложений"} TON, листингов ${row.count}`)].join("\n");
   if (!result?.ok) return `Цены по площадкам: ${result?.market ?? '?'} ${result?.reason || `HTTP ${result?.status ?? '?'}`}. Проверено площадок: ${result?.rows?.length || 0}/5. Слоты не менялись.`;
   const price = value => Number.isFinite(value) ? value.toFixed(2) : '—';
   const lines = result.rows.map(row => `${row.market}: ${price(row.floor)} / ${price(row.fifth)} TON (1-е / 5-е), листингов ${row.count}${row.count === 50 ? '+' : ''}`);
