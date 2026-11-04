@@ -25,6 +25,15 @@ export default async function handler(req,res){
       run.total=r.catalogTotal;run.index=r.nextOffset;
       run.status=r.nextOffset===null?'completed':'running';
       await store.saveCatalogRun(run);
+      if(run.status==='running'){
+        try{
+          await send(`Сбор каталога: running; обработано ${run.checked}/${run.total}; неполных ${run.incomplete}; полностью проверено ${run.checked-run.incomplete}.\nКоллекция: ${r.collections[0].collection}. Итог придёт после завершения. Слоты не меняются.`);
+        }catch{
+          // A notification failure must not stop the read-only scan.
+          run.notificationFailures=(run.notificationFailures||0)+1;
+          await store.saveCatalogRun(run);
+        }
+      }
       if(run.status==='completed')await send(`Обход каталога завершён: ${run.checked}/${run.total}. Неполная история: ${run.incomplete}. Данные сохранены в закрытом хранилище. Это история продаж; текущие предложения и торговый план требуют отдельной проверки. Слоты не менялись.`);
       else{
         const next=await fetch(URL,{method:'POST',headers:{Authorization:'Bearer '+process.env.CRON_SECRET,'Content-Type':'application/json'},
