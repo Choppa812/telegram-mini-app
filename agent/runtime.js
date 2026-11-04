@@ -23,6 +23,8 @@ export function runtime(env = process.env, fetcher = fetch) {
   const prefix = `satellite-control:${env.CONTROL_OWNER_ID}:`;
   const decode = value => typeof value === 'string' ? JSON.parse(value) : value;
   const store = {
+    acquireCatalogLease: async () => {const token=randomUUID();return await redis('SET',prefix+'catalog-lease',token,'NX','EX','330')?token:null;},
+    releaseCatalogLease: token=>redis('EVAL',"if redis.call('GET',KEYS[1])==ARGV[1] then return redis.call('DEL',KEYS[1]) end; return 0",1,prefix+'catalog-lease',token),
     getCatalogRun: async () => decode(await redis('GET',prefix+'catalog-run')),
     saveCatalogRun: row => redis('SET',prefix+'catalog-run',JSON.stringify(row),'EX','604800'),
     claimCatalogStep: (run,index) => redis('SET',prefix+'catalog-step:'+run+':'+index,'1','NX','EX','604800'),

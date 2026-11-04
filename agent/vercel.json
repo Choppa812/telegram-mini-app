@@ -28,6 +28,16 @@
     },
     "api/catalog-worker.js": {
       "maxDuration": 300
+    },
+    "api/catalog-queue.js": {
+      "maxDuration": 300,
+      "experimentalTriggers": [
+        {
+          "topic": "catalog-scan",
+          "type": "queue/v2beta",
+          "retryAfterSeconds": 60
+        }
+      ]
     }
   }
 }

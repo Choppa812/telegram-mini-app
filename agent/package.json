@@ -1,1 +1,1 @@
-{"name":"gift-satellite-controller","private":true,"type":"module","scripts":{"test":"node --test control.test.js setup.test.js satellite.test.js"},"dependencies":{"@vercel/functions":"^3.10.6"}}
+{"name":"gift-satellite-controller","private":true,"type":"module","scripts":{"test":"node --test control.test.js setup.test.js satellite.test.js"},"dependencies":{"@vercel/functions":"^3.10.6","@vercel/queue":"^0.11.0"}}
