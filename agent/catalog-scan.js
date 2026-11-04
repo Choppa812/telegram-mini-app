@@ -9,7 +9,7 @@ const summary=rows=>{
 
 // Read-only inventory and sales discovery. A scan is not a trading plan.
 export async function scanCatalog(key,{fetcher=fetch,pause=ms=>new Promise(r=>setTimeout(r,ms)),
-  now=Date.now(),maxPages=10000,onCollection=async()=>{}}={}) {
+  now=Date.now(),maxPages=10000,onCollection=async()=>{},offset=0,limit=Infinity}={}) {
   if(!key)throw new Error('API_KEY_MISSING');
   const request=async(path,body)=>{
     await pause(1500);
@@ -22,8 +22,9 @@ export async function scanCatalog(key,{fetcher=fetch,pause=ms=>new Promise(r=>se
   };
   const catalog=await request('/gift/collections');
   if(!Array.isArray(catalog)||catalog.some(c=>typeof c?.name!=='string'))throw new Error('INVALID_CATALOG');
-  const result={startedAt:new Date(now).toISOString(),collections:[],complete:false,writesPerformed:0};
-  for(const collection of catalog){
+  if(!Number.isInteger(offset)||offset<0||!(limit===Infinity||Number.isInteger(limit)&&limit>0))throw new Error('INVALID_SCAN_RANGE');
+  const result={startedAt:new Date(now).toISOString(),catalogTotal:catalog.length,offset,collections:[],complete:false,writesPerformed:0};
+  for(const collection of catalog.slice(offset,offset+limit)){
     const row={collection:collection.name,complete:false,models:[],backdrops:[],combinations:[],pages:0};
     try{
       const detail=await request('/gift/collection/'+encodeURIComponent(collection.name));
@@ -60,5 +61,7 @@ export async function scanCatalog(key,{fetcher=fetch,pause=ms=>new Promise(r=>se
     result.collections.push(row);await onCollection(row,result);
   }
   result.complete=result.collections.every(c=>c.complete);
+  result.nextOffset=offset+result.collections.length<catalog.length?offset+result.collections.length:null;
+  result.catalogComplete=offset===0&&result.nextOffset===null&&result.complete;
   return result;
 }
