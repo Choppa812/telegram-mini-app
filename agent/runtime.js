@@ -23,6 +23,9 @@ export function runtime(env = process.env, fetcher = fetch) {
   const prefix = `satellite-control:${env.CONTROL_OWNER_ID}:`;
   const decode = value => typeof value === 'string' ? JSON.parse(value) : value;
   const store = {
+    getCatalogRun: async () => decode(await redis('GET',prefix+'catalog-run')),
+    saveCatalogRun: row => redis('SET',prefix+'catalog-run',JSON.stringify(row),'EX','604800'),
+    claimCatalogStep: (run,index) => redis('SET',prefix+'catalog-step:'+run+':'+index,'1','NX','EX','604800'),
     saveCatalogCollection: (index,row) => redis('SET', prefix+'catalog:'+index, JSON.stringify(row), 'EX','604800'),
     // Missing state is paused. Unavailable storage throws and prevents writes.
     isPaused: async () => (await redis('GET', `${prefix}paused`)) !== '0',

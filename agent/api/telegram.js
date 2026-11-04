@@ -20,7 +20,7 @@ export default async function handler(req, res) {
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
     const context=runtime();
-    await handleCommand(body, { ...context, catalogScan:async index=>{
+    await handleCommand(body, { ...context, catalogAll:async()=>{const response=await fetch('https://gift-price-controller.vercel.app/api/catalog-worker',{method:'POST',headers:{Authorization:'Bearer '+process.env.CRON_SECRET,'Content-Type':'application/json'},body:'{}',signal:AbortSignal.timeout(12000)});if(!response.ok)throw new Error('SCAN_START_FAILED');return 'Полный обход каталога запущен или уже выполняется. Итог придёт после завершения. Слоты не меняются.';}, catalogScan:async index=>{
       const r=await scanCatalog(process.env.GIFT_SATELLITE_API_KEY,{offset:index,limit:1,maxPages:100,onCollection:row=>context.store.saveCatalogCollection(index,row)});
       const row=r.collections[0];
       if(!row)return 'Каталог завершён; индекс вне списка.';
