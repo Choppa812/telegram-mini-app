@@ -6,6 +6,11 @@ import { competitivePrice } from './competitive.js';
 import { scanCatalog } from './catalog-scan.js';
 
 const identity=r=>JSON.stringify([r.collection,r.model,r.backdrop]);
+export function consistentPrices(history){
+ const day=history?.day?.q1,week=history?.week?.q1,median=history?.week?.median;
+ return Number.isFinite(day)&&Number.isFinite(week)&&day>0&&week>0&&day>=week*.5&&
+  (!(Number.isFinite(median)&&median>0)||week>=median*.5);
+}
 export function diversifySelection(rows,collection='Chill Flame',limit=3){
  const retained=new Set(rows.filter(r=>r.collection===collection)
   .sort((a,b)=>b.history.day.count-a.history.day.count||b.history.week.count-a.history.week.count)
@@ -33,6 +38,13 @@ export async function startResearch({store,key,enqueue,diversify=false}){
  const lease=await store.acquireCatalogLease();if(!lease)throw Error('RESEARCH_BUSY');
  try{
   let previous=await store.getResearchRun();
+  if(previous?.scope==='Black'&&previous.selected?.some(r=>!consistentPrices(r.history))){
+   const removed=previous.selected.filter(r=>!consistentPrices(r.history));
+   previous={...previous,id:randomUUID(),revisedAt:Date.now(),selected:previous.selected.filter(r=>consistentPrices(r.history)),
+    rejected:[...previous.rejected,...removed.map(r=>({collection:r.collection,model:r.model,backdrop:r.backdrop,reason:'INCONSISTENT_EXACT_PRICES'}))]};
+   previous.status=previous.index<previous.candidates.length?'running':(previous.discoveryIndex??0)<(previous.discoveryTotal??132)?'discovering':'insufficient';
+   previous.discoveryIndex??=0;await store.saveResearchRun(previous);
+  }
   if(diversify&&previous?.scope==='Black'&&previous.selected?.length&&previous.collectionCaps?.['Chill Flame']!==3){
    const profile=await readSatellite('/user/me',{},key,'token');
    const balance=Number(profile.data?.tonBalance);
@@ -105,7 +117,8 @@ export async function processResearchStep(message,{store,key,send,enqueue,varian
    let history;
    try{history=await variantReader(collection,model,backdrop,key,{maxPages:100});}
    catch(error){if(error.message==='INVALID_VARIANT_REQUEST')history={ok:false,complete:false};else throw error;}
-   if(history.ok&&history.complete&&history.day.count>=2&&history.week.count>=8&&history.day.q1>0&&history.week.q1>0){
+   if(history.ok&&history.complete&&history.day.count>=2&&history.week.count>=8&&!consistentPrices(history))reason='INCONSISTENT_EXACT_PRICES';
+   if(history.ok&&history.complete&&history.day.count>=2&&history.week.count>=8&&consistentPrices(history)){
     const market=await marketReader(collection,key,undefined,undefined,backdrop,model);
     const floors=(market.rows||[]).map(r=>r.floor).filter(f=>Number.isFinite(f)&&f>0);
     reason='EXACT_MARKET_UNAVAILABLE';
@@ -141,7 +154,7 @@ export function researchText(run){
   ...(run.discoveryIndex!==undefined?[`Дополнительный сбор Black: ${run.discoveryIndex}/${run.discoveryTotal??132} коллекций.`]:[]),
   ...(run.status==='running'?[`Следующий: ${run.candidates[run.index]?.collection} / ${run.candidates[run.index]?.model} / ${run.candidates[run.index]?.backdrop}.`]:[]),
   ...run.selected.map((r,i)=>`${i+1}. ${r.collection} / ${r.model} / ${r.backdrop}: до ${r.ceiling.toFixed(2)} TON; ${r.history.day.count}/${r.history.week.count} продаж.`),
-  'Требуется полная точная история: минимум 2 продажи за сутки и 8 за неделю. Покупка: 3%; продажа: резерв 2%; расчётный запас 1,5 TON. Это анализ; слоты не изменялись.'];
+  'Требуется полная точная история: минимум 2 продажи за сутки и 8 за неделю. Ценовые расхождения более чем вдвое исключаются. Покупка: 3%; продажа: резерв 2%; запас 1,5 TON. Это анализ; слоты не изменялись.'];
  return lines.join('\n');
 }
 

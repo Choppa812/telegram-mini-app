@@ -73,3 +73,12 @@ test('research of an already active exact model never raises its existing approv
  await processResearchStep({run:'r',index:0},{key:'test',send:async()=>{},enqueue:async()=>{},store:{acquireCatalogLease:async()=>'lease',releaseCatalogLease:async()=>{},getResearchRun:async()=>run,saveResearchRun:async()=>{}},variantReader:async()=>({ok:true,complete:true,day:{count:4,q1:30},week:{count:12,q1:30}}),marketReader:async()=>({ok:true,rows:Array.from({length:5},()=>({floor:35}))})});
  assert.equal(run.selected[0].ceiling,10);
 });
+
+test('inconsistent exact prices cannot create an implausibly tiny replacement bid',async()=>{
+ const {consistentPrices}=await import('./portfolio-research.js');
+ assert.equal(consistentPrices({day:{q1:1.72},week:{q1:24.26,median:25.75}}),false);
+ assert.equal(consistentPrices({day:{q1:25},week:{q1:3,median:25}}),false);
+ const run={id:'r',status:'running',index:0,balance:100,candidates:[{collection:'Gift',model:'Model',backdrop:'Black'}],selected:[],rejected:[]};let markets=0;
+ await processResearchStep({run:'r',index:0},{key:'test',send:async()=>{},enqueue:async()=>{},store:{acquireCatalogLease:async()=>'lease',releaseCatalogLease:async()=>{},getResearchRun:async()=>run,saveResearchRun:async()=>{}},variantReader:async()=>({ok:true,complete:true,day:{count:2,q1:1.72},week:{count:16,q1:24.26,median:25.75}}),marketReader:async()=>{markets++;}});
+ assert.equal(run.selected.length,0);assert.equal(markets,0);assert.equal(run.rejected[0].reason,'INCONSISTENT_EXACT_PRICES');
+});
