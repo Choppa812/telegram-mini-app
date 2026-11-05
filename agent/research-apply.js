@@ -4,6 +4,7 @@ const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const fits=(s,r)=>s.collectionName===r.collection&&same(s.modelNames,[r.model])&&same(s.backdropNames,[r.backdrop]);
 export function assignResearchSlots(selected,slots){
  if(selected.length!==28||slots.length!==28||new Set(slots.map(s=>s._id)).size!==28)throw Error('FULL_PLAN_REQUIRED');
+ if(selected.some(r=>r.backdrop!=='Black'))throw Error('BLACK_ONLY_PLAN_REQUIRED');
  const used=new Set(),assigned=[];
  for(const row of selected){
   const exact=slots.find(s=>!used.has(s._id)&&fits(s,row));
@@ -14,7 +15,7 @@ export function assignResearchSlots(selected,slots){
   slot=slot||free.shift();
   const replaces=Object.fromEntries(['collectionName','modelNames','backdropNames','portalsAutobuy','portalsAutobuyQuantity','portalsAutobuyMaxPrice'].filter(k=>slot[k]!==undefined).map(k=>[k,slot[k]]));
   return {slot:slots.indexOf(slot)+1,subscriptionId:slot._id,original:slot.collectionName,
-   collection:row.collection,model:row.model,backdrop:row.backdrop,ceiling:row.ceiling,minDay:3,minWeek:8,pricing:'competitive',manualActivation:true,replaces};
+   collection:row.collection,model:row.model,backdrop:row.backdrop,ceiling:row.ceiling,minDay:2,minWeek:8,pricing:'competitive',manualActivation:true,replaces};
  }).sort((a,b)=>a.slot-b.slot);
 }
 export async function startResearchApply({store,key,enqueue}){
@@ -28,7 +29,7 @@ export async function startResearchApply({store,key,enqueue}){
    return 'Применение полного портфеля уже выполняется.';
   }
   const research=await store.getResearchRun();
-  if(research?.status!=='completed'||research.selected?.length!==28||Date.now()-research.startedAt>21600000)throw Error('FRESH_FULL_RESEARCH_REQUIRED');
+  if(research?.scope!=='Black'||research?.status!=='completed'||research.selected?.length!==28||Date.now()-research.startedAt>21600000)throw Error('FRESH_FULL_RESEARCH_REQUIRED');
   if(existing?.id===research.id)return 'Этот портфель уже применён. Проверьте /positions.';
   const response=await readSatellite('/user/subscriptions',{},key,'token');
   if(!response.ok||!Array.isArray(response.data))throw Error('ACCOUNT_READ_FAILED');
