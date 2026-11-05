@@ -46,3 +46,9 @@ test('an interrupted in-flight operation is never executed a second time',async(
  await processResearchApply({run:'r',index:0},{store:{acquireCatalogLease:async()=>'lease',releaseCatalogLease:async()=>{},getActiveResearchPlan:async()=>plan,isPaused:async()=>false,saveActiveResearchPlan:async()=>{}},send:async()=>{},apply:async()=>{attempts++;}});
  assert.equal(attempts,0);assert.equal(plan.status,'blocked');
 });
+
+test('filling missing slots never rewrites preserved active orders',async()=>{
+ const plan={id:'r',status:'applying',index:0,rows:Array.from({length:28},(_,i)=>({slot:i+1,preserveExisting:true,ceiling:10})),results:[]};let calls=0;
+ await processResearchApply({run:'r',index:0},{store:{acquireCatalogLease:async()=>'lease',releaseCatalogLease:async()=>{},getActiveResearchPlan:async()=>plan,isPaused:async()=>false,saveActiveResearchPlan:async()=>{}},send:async()=>{},enqueue:async()=>{},apply:async()=>{calls++;}});
+ assert.equal(calls,0);assert.equal(plan.index,1);assert.equal(plan.results[0].reason,'PRESERVED_EXISTING');
+});

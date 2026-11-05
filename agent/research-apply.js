@@ -17,7 +17,7 @@ export function assignResearchSlots(selected,slots){
   slot=slot||free.shift();
   const replaces=Object.fromEntries(['collectionName','modelNames','backdropNames','portalsAutobuy','portalsAutobuyQuantity','portalsAutobuyMaxPrice'].filter(k=>slot[k]!==undefined).map(k=>[k,slot[k]]));
   return {slot:slots.indexOf(slot)+1,subscriptionId:slot._id,original:slot.collectionName,
-   collection:row.collection,model:row.model,backdrop:row.backdrop,ceiling:row.ceiling,minDay:2,minWeek:8,pricing:'competitive',manualActivation:true,replaces};
+   collection:row.collection,model:row.model,backdrop:row.backdrop,ceiling:row.ceiling,minDay:2,minWeek:8,pricing:'competitive',manualActivation:true,preserveExisting:row.retained===true,replaces};
  }).sort((a,b)=>a.slot-b.slot);
 }
 export async function startResearchApply({store,key,enqueue}){
@@ -39,6 +39,7 @@ export async function startResearchApply({store,key,enqueue}){
   if(existing?.id===research.id)return 'Этот портфель уже применён. Проверьте /positions.';
   const response=await readSatellite('/user/subscriptions',{},key,'token');
   if(!response.ok||!Array.isArray(response.data))throw Error('ACCOUNT_READ_FAILED');
+  if(research.preserveExisting&&research.selected.filter(r=>r.retained).some(r=>!response.data.some(s=>fits(s,r)&&s.portalsAutobuy===true&&s.portalsAutobuyQuantity===1&&Math.abs(Number(s.portalsAutobuyMaxPrice)-r.ceiling)<.001)))throw Error('PRESERVED_SLOT_CHANGED');
   const plan={id:research.id,status:'applying',index:0,rows:assignResearchSlots(research.selected,response.data),results:[]};
   if(await store.isPaused())throw Error('AUTOMATION_PAUSED');
   // Publish the canonical plan before the first financial write. Daily uses it
@@ -65,7 +66,7 @@ export async function processResearchApply(message,{store,key,send,enqueue,apply
    // never silently re-arm an order which may already have bought one gift.
    plan.inFlight=plan.index;await store.saveActiveResearchPlan(plan);
    let result;
-   try{result=await apply(row.slot,key,{portfolio:plan.rows,allowManualActivation:true,allowApprovedReplacement:true,beforeWrite:async()=>{if(await store.isPaused())throw Error('AUTOMATION_PAUSED');}});}
+   try{result=row.preserveExisting?{slot:row.slot,changed:false,reason:'PRESERVED_EXISTING',price:row.ceiling}:await apply(row.slot,key,{portfolio:plan.rows,allowManualActivation:true,allowApprovedReplacement:true,beforeWrite:async()=>{if(await store.isPaused())throw Error('AUTOMATION_PAUSED');}});}
    catch(error){
     if(error?.message==='AUTOMATION_PAUSED'){delete plan.inFlight;await store.saveActiveResearchPlan(plan);return;}
     await block();return;

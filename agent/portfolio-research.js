@@ -34,7 +34,7 @@ export function researchCandidates(rows,balance,runId,slots){
   for(const group of groups.values())if(group.length&&result.length<160)add(group.shift());
  return result;
 }
-export async function startResearch({store,key,enqueue,diversify=false,audit=false,wait=ms=>new Promise(resolve=>setTimeout(resolve,ms))}){
+export async function startResearch({store,key,enqueue,diversify=false,audit=false,fill=false,wait=ms=>new Promise(resolve=>setTimeout(resolve,ms))}){
  // Queue sends are pinned to the sending deployment. A correction must acquire
  // the shared checkpoint between steps and resume from the current deployment,
  // rather than letting an old running worker overwrite the revised proposal.
@@ -45,6 +45,30 @@ export async function startResearch({store,key,enqueue,diversify=false,audit=fal
  if(!lease)throw Error('RESEARCH_BUSY');
  try{
   let previous=await store.getResearchRun();
+  if(fill){
+   if(previous?.preserveExisting&&['running','discovering'].includes(previous.status)){
+    await store.releaseCatalogLease(lease);
+    await enqueue('catalog-scan',{kind:'research',run:previous.id,index:previous.index,...(previous.status==='discovering'?{discoveryIndex:previous.discoveryIndex}:{})},{idempotencyKey:previous.id+':fill-resume:'+previous.index,retentionSeconds:604800});
+    return researchText(previous);
+   }
+   const [profile,subs]=await Promise.all([readSatellite('/user/me',{},key,'token'),readSatellite('/user/subscriptions',{},key,'token')]);
+   if(!profile.ok||!subs.ok||!Array.isArray(subs.data)||subs.data.length!==28)throw Error('ACCOUNT_READ_FAILED');
+   const balance=Number(profile.data.tonBalance);if(!Number.isFinite(balance)||balance<=0)throw Error('INVALID_BALANCE');
+   const selected=[];
+   for(const s of subs.data.filter(s=>s.portalsAutobuy===true&&s.portalsAutobuyQuantity===1)){
+    if(s.modelNames?.length!==1||JSON.stringify(s.backdropNames)!=='["Black"]')throw Error('UNEXPECTED_ACTIVE_ORDER');
+    const r=previous?.selected.find(r=>r.collection===s.collectionName&&r.model===s.modelNames[0]&&r.backdrop==='Black');
+    if(!r)throw Error('ACTIVE_ORDER_NOT_IN_RESEARCH');
+    selected.push({...r,ceiling:Number(s.portalsAutobuyMaxPrice),retained:true});
+   }
+   if(selected.length===28)return 'Все 28 слотов уже активны.';
+   const occupied=new Set(subs.data.filter(s=>s.modelNames?.length===1&&s.backdropNames?.length===1).map(s=>identity({collection:s.collectionName,model:s.modelNames[0],backdrop:s.backdropNames[0]})));
+   const candidates=(previous?.candidates||[]).filter(r=>r.backdrop==='Black'&&!occupied.has(identity(r))).sort((a,b)=>(b.day?.count||0)-(a.day?.count||0));
+   const run={id:randomUUID(),scope:'Black',status:candidates.length?'running':'discovering',startedAt:Date.now(),index:0,balance,slots:subs.data,candidates,selected,rejected:[],collectionCaps:{'Chill Flame':3},preserveExisting:true,discoveryIndex:previous?.discoveryIndex??0,discoveryTotal:previous?.discoveryTotal??132};
+   await store.saveResearchRun(run);await store.releaseCatalogLease(lease);
+   await enqueue('catalog-scan',{kind:'research',run:run.id,index:0,...(run.status==='discovering'?{discoveryIndex:run.discoveryIndex}:{})},{idempotencyKey:run.id+':fill:0',retentionSeconds:604800});
+   return researchText(run);
+  }
   if(audit&&previous?.scope==='Black'){
    const selected=[];
    for(const r of previous.selected){
@@ -171,6 +195,7 @@ export async function processResearchStep(message,{store,key,send,enqueue,varian
 export function researchText(run){
  if(!run)return 'Подбор портфеля ещё не запущен.';
  const lines=[`Подбор 28 слотов только Black: ${run.status}; проверено ${run.index}/${run.candidates.length}; подтверждено ${run.selected.length}/28.`,
+  ...(run.preserveExisting?[`Действующих ставок сохраняется: ${run.selected.filter(r=>r.retained).length}; изменения только для свободных мест.`]:[]),
   ...(run.collectionCaps?.['Chill Flame']===3?['Chill Flame: максимум 3 слота; остальные — другие коллекции.']:[]),
   ...(run.discoveryIndex!==undefined?[`Дополнительный сбор Black: ${run.discoveryIndex}/${run.discoveryTotal??132} коллекций.`]:[]),
   ...(run.status==='running'?[`Следующий: ${run.candidates[run.index]?.collection} / ${run.candidates[run.index]?.model} / ${run.candidates[run.index]?.backdrop}.`]:[]),
