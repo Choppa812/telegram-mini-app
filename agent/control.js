@@ -27,17 +27,19 @@ export function reportText(report) {
   ].filter(Boolean).join('\n');
 }
 
-export async function handleCommand(update, { ownerId, store, send, checkApi, marketOverview, floorOverview, highBlackFloors, inspectGift, feeOverview, turnoverOverview, blackDailySales, blackScan, positionsOverview, blackModels, modelMarkets, crossMarket, variantLeads, variantDetail, variantCross, applyBlack, apply28, applyAll, applyCompetitive, applyPrestige, cleanBlack, catalogScan, catalogAll, reviewCatalog, applyApproved, research28, researchStatus, applyResearch }) {
+export async function handleCommand(update, { ownerId, store, send, checkApi, marketOverview, floorOverview, highBlackFloors, inspectGift, feeOverview, turnoverOverview, blackDailySales, blackScan, positionsOverview, blackModels, modelMarkets, crossMarket, variantLeads, variantDetail, variantCross, applyBlack, apply28, applyAll, applyCompetitive, applyPrestige, cleanBlack, catalogScan, catalogAll, reviewCatalog, applyApproved, research28, researchStatus, applyResearch, applyStatus }) {
   const m = update?.message;
   if (!ownerId || m?.chat?.type !== 'private' || String(m?.from?.id) !== String(ownerId) || String(m?.chat?.id) !== String(ownerId)) return false;
   const command = (m.text || '').trim().split(/\s/)[0].split('@')[0].toLowerCase();
-  if (!['/start', '/help', '/status', '/report', '/pause', '/resume', '/checkapi', '/market', '/floors', '/highfloors', '/inspect', '/fees', '/rank', '/blackday', '/blackscan', '/blackscan90', '/positions', '/models', '/marketsales', '/cross', '/variants', '/variant', '/variantcross', '/applyblack', '/apply28', '/applyall', '/applycompetitive', '/applyprestige', '/blackclean', '/catalogscan', '/catalogall', '/catalogreport', '/catalogreview', '/applyapproved', '/research28', '/researchstatus', '/applyresearch28', '/researchdiverse'].includes(command)) return false;
+  if (!['/start', '/help', '/status', '/report', '/pause', '/resume', '/checkapi', '/market', '/floors', '/highfloors', '/inspect', '/fees', '/rank', '/blackday', '/blackscan', '/blackscan90', '/positions', '/models', '/marketsales', '/cross', '/variants', '/variant', '/variantcross', '/applyblack', '/apply28', '/applyall', '/applycompetitive', '/applyprestige', '/blackclean', '/catalogscan', '/catalogall', '/catalogreport', '/catalogreview', '/applyapproved', '/research28', '/researchstatus', '/applyresearch28', '/researchdiverse', '/applystatus'].includes(command)) return false;
   if (!Number.isSafeInteger(update.update_id)) return false;
   if(['/applyapproved','/applyblack','/apply28','/applyall','/applycompetitive','/applyprestige','/blackclean'].includes(command)&&await store.getActiveResearchPlan?.()){
     await send('Для аккаунта опубликован новый полный портфель. Старые команды не применяются; /positions — текущие настройки, /applyresearch28 — продолжить применение полного плана.');
     return true;
   }
-  if(command==='/applyresearch28'){
+  if(command==='/applystatus'){
+ try{await send(await applyStatus()||'Применение полного плана ещё не запускалось.');}catch{await send('Не удалось проверить фактическое состояние через API. Слоты не менялись.');}
+ }else if(command==='/applyresearch28'){
  if(await store.isPaused())await send('Автонастройка на паузе.');
  else try{await send(await applyResearch());}catch{await send('Применение не запущено: нужен завершённый свежий анализ 28 вариантов либо восстановление доступа. Слоты не менялись.');}
  }else if(command==='/research28'||command==='/researchstatus'||command==='/researchdiverse'){
@@ -192,9 +194,9 @@ export async function handleCommand(update, { ownerId, store, send, checkApi, ma
     }
     await send(applied ? (paused ? STOP_NOTICE : 'Автонастройка разрешена. Следующая проверка — по ежедневному расписанию Vercel.') : `Повторная или устаревшая команда пропущена. Автонастройка ${paused ? 'на паузе' : 'разрешена'}.`);
   } else if (command === '/report') {
-    await send(reportText(await store.getReport()));
+    await send((await applyStatus?.())||reportText(await store.getReport()));
   } else {
-    await send(`Автонастройка: ${(await store.isPaused()) ? 'на паузе' : 'разрешена'}.\n${reportText(await store.getReport())}\n/pause — остановить изменение лимитов\n/resume — разрешить ежедневную настройку\n/report — последний отчёт\n/market — обзор рынка без изменений`);
+    await send(`Автонастройка: ${(await store.isPaused()) ? 'на паузе' : 'разрешена'}.\n${(await applyStatus?.())||reportText(await store.getReport())}\n/pause — остановить изменение лимитов\n/resume — разрешить ежедневную настройку\n/report — последний отчёт\n/market — обзор рынка без изменений`);
   }
   return true;
 }

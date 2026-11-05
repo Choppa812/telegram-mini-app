@@ -57,6 +57,12 @@ export async function startResearch({store,key,enqueue,diversify=false}){
   const rows=await store.getCatalogRows(catalog.total);
   const run={id:randomUUID(),scope:'Black',status:'running',startedAt:Date.now(),index:0,balance,slots:subs.data,
    candidates:researchCandidates(rows,balance,catalog.id,subs.data),selected:[],rejected:[],collectionCaps:{'Chill Flame':3}};
+  // Reuse discoveries as candidates, never as sales evidence. Each is checked
+  // again against current complete exact history and all five marketplaces.
+  const seen=new Set(run.candidates.map(identity));
+  for(const r of previous?.scope==='Black'?previous.candidates||[]:[]){
+   if(r.backdrop==='Black'&&!seen.has(identity(r))){run.candidates.push(r);seen.add(identity(r));}
+  }
   if(!run.candidates.length){run.status='discovering';run.discoveryIndex=0;}
   await store.saveResearchRun(run);
   await store.releaseCatalogLease(lease);
