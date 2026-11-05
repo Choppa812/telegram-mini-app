@@ -56,7 +56,7 @@ export async function startResearch({store,key,enqueue,diversify=false}){
   const balance=Number(profile.data.tonBalance);if(!Number.isFinite(balance)||balance<=0)throw Error('INVALID_BALANCE');
   const rows=await store.getCatalogRows(catalog.total);
   const run={id:randomUUID(),scope:'Black',status:'running',startedAt:Date.now(),index:0,balance,slots:subs.data,
-   candidates:researchCandidates(rows,balance,catalog.id,subs.data),selected:[],rejected:[],...(diversify?{collectionCaps:{'Chill Flame':3}}:{})};
+   candidates:researchCandidates(rows,balance,catalog.id,subs.data),selected:[],rejected:[],collectionCaps:{'Chill Flame':3}};
   if(!run.candidates.length){run.status='discovering';run.discoveryIndex=0;}
   await store.saveResearchRun(run);
   await store.releaseCatalogLease(lease);
@@ -138,4 +138,5 @@ export function researchText(run){
   'Требуется полная точная история: минимум 2 продажи за сутки и 8 за неделю. Покупка: 3%; продажа: резерв 2%; расчётный запас 1,5 TON. Это анализ; слоты не изменялись.'];
  return lines.join('\n');
 }
+
 
