@@ -6,7 +6,14 @@ import { applyPortfolioSlot } from './portfolio.js';
 test('competitive bid respects completed-sale margin, listing floor and the approved ceiling',()=>{
   assert.equal(competitivePrice({ceiling:18.90,day:22.81,week:22.24,floor:23.97}),18.90);
   assert.equal(competitivePrice({ceiling:25,day:22,week:21,floor:24}),18.52);
-  assert.equal(competitivePrice({ceiling:25,day:40,week:40,floor:20}),19.50);
+  assert.equal(competitivePrice({ceiling:25,day:40,week:40,floor:20}),17.57);
+});
+
+test('a falling listing floor still covers buy and sell fees and the required profit',()=>{
+ for(const floor of [2,5,20,100]){
+  const bid=competitivePrice({ceiling:1000,day:200,week:180,floor});
+  if(bid>0)assert.ok(floor*.98-bid*1.03>=1.5-1e-9);
+ }
 });
 
 test('changed exact model requires the expected previous inactive model',async()=>{

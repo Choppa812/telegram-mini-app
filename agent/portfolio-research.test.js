@@ -89,3 +89,11 @@ test('research revision waits for a safe checkpoint instead of racing the runnin
  const text=await startResearch({key:'test',wait:async()=>{waits++;},enqueue:async()=>{enqueued++;},store:{acquireCatalogLease:async()=>++claims<3?null:'lease',releaseCatalogLease:async token=>assert.equal(token,'lease'),getResearchRun:async()=>run}});
  assert.equal(waits,2);assert.equal(enqueued,1);assert.match(text,/running/);
 });
+
+test('proposal audit caps bids by live listing economics without touching active orders',async()=>{
+ const {startResearch}=await import('./portfolio-research.js');
+ const rows=Array.from({length:28},(_,i)=>({collection:'Gift',model:'Model '+i,backdrop:'Black',ceiling:i===0?10:19.5,checkedAt:123,history:{day:{count:3,q1:40},week:{count:12,q1:40,median:40}},market:{rows:[{floor:20}]}}));
+ const old={id:'old',scope:'Black',status:'completed',index:28,candidates:rows,selected:rows,rejected:[],collectionCaps:{'Chill Flame':3},discoveryIndex:46,discoveryTotal:132};let saved;
+ const text=await startResearch({key:'test',audit:true,enqueue:async()=>{throw Error('must not enqueue');},store:{acquireCatalogLease:async()=>'lease',releaseCatalogLease:async()=>{},getResearchRun:async()=>old,saveResearchRun:async r=>{saved=r;},saveActiveResearchPlan:async()=>{throw Error('must not modify active plan');}}});
+ assert.notEqual(saved.id,old.id);assert.equal(saved.selected.length,28);assert.equal(saved.selected[0].ceiling,10);assert.equal(saved.selected[1].ceiling,17.57);assert.equal(saved.selected[1].checkedAt,123);assert.match(text,/completed/);
+});

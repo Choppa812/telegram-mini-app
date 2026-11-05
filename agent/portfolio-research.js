@@ -34,7 +34,7 @@ export function researchCandidates(rows,balance,runId,slots){
   for(const group of groups.values())if(group.length&&result.length<160)add(group.shift());
  return result;
 }
-export async function startResearch({store,key,enqueue,diversify=false,wait=ms=>new Promise(resolve=>setTimeout(resolve,ms))}){
+export async function startResearch({store,key,enqueue,diversify=false,audit=false,wait=ms=>new Promise(resolve=>setTimeout(resolve,ms))}){
  // Queue sends are pinned to the sending deployment. A correction must acquire
  // the shared checkpoint between steps and resume from the current deployment,
  // rather than letting an old running worker overwrite the revised proposal.
@@ -45,6 +45,20 @@ export async function startResearch({store,key,enqueue,diversify=false,wait=ms=>
  if(!lease)throw Error('RESEARCH_BUSY');
  try{
   let previous=await store.getResearchRun();
+  if(audit&&previous?.scope==='Black'){
+   const selected=[];
+   for(const r of previous.selected){
+    if(!consistentPrices(r.history))continue;
+    const floors=(r.market?.rows||[]).map(m=>m.floor).filter(f=>Number.isFinite(f)&&f>0);
+    if(!floors.length)continue;
+    const ceiling=competitivePrice({ceiling:r.ceiling,day:r.history.day.q1,week:r.history.week.q1,floor:Math.min(...floors)});
+    if(ceiling>0)selected.push({...r,ceiling});
+   }
+   previous={...previous,id:randomUUID(),revisedAt:Date.now(),selected};
+   previous.status=selected.length===28?'completed':previous.index<previous.candidates.length?'running':(previous.discoveryIndex??0)<(previous.discoveryTotal??132)?'discovering':'insufficient';
+   previous.discoveryIndex??=0;await store.saveResearchRun(previous);
+   if(previous.status==='completed')return researchText(previous);
+  }
   if(previous?.scope==='Black'&&previous.selected?.some(r=>!consistentPrices(r.history))){
    const removed=previous.selected.filter(r=>!consistentPrices(r.history));
    previous={...previous,id:randomUUID(),revisedAt:Date.now(),selected:previous.selected.filter(r=>consistentPrices(r.history)),
