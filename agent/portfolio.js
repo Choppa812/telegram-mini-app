@@ -57,6 +57,7 @@ export async function applyPortfolioSlot(slotNumber, key, {
   const plan=portfolio.find(item=>item.slot===slotNumber);
   if(!plan||!key||typeof beforeWrite!=='function')throw new Error('PORTFOLIO_CONFIGURATION_MISSING');
   const backdrop=plan.backdrop||'Black';
+  if(backdrop!=='Black')throw new Error('BLACK_ONLY_PLAN_REQUIRED');
   const [slotsResponse,profileResponse]=await Promise.all([
     readSatellite('/user/subscriptions',{},key,'token',fetcher),
     readSatellite('/user/me',{},key,'token',fetcher),
@@ -136,7 +137,7 @@ export async function applyPortfolioSlot(slotNumber, key, {
 
 export async function applyPortfolio(key, options={}) {
   const result={checked:0,changed:0,skipped:0,details:[]};
-  const portfolio=options.portfolio||loadPortfolio();
+  const portfolio=(options.portfolio||loadPortfolio()).filter(row=>(row.backdrop||'Black')==='Black');
   const selected=options.batch===undefined?portfolio:portfolio.slice(options.batch*3,options.batch*3+3);
   if(!selected.length)throw new Error('INVALID_PORTFOLIO_BATCH');
   for(const plan of selected){

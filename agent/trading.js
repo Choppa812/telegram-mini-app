@@ -72,6 +72,7 @@ async function blackFloor(collection, key, fetcher, pause) {
 
 export async function writeSubscription(id, body, key, fetcher) {
   if(!/^[a-f0-9]{24}$/i.test(id||''))throw new Error('INVALID_SUBSCRIPTION_ID');
+  if(body.portalsAutobuy===true&&JSON.stringify(body.backdropNames)!=='["Black"]')throw new Error('BLACK_ONLY_PLAN_REQUIRED');
   const response=await fetcher(new URL(`${BASE}/user/update-subscription/${id}`),{method:'PUT',headers:{Authorization:`Token ${key}`,Accept:'application/json','Content-Type':'application/json'},body:JSON.stringify(body),redirect:'error',signal:AbortSignal.timeout(12000)});
   if(!response.ok){
     let detail='';
