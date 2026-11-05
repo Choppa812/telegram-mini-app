@@ -34,8 +34,15 @@ export function researchCandidates(rows,balance,runId,slots){
   for(const group of groups.values())if(group.length&&result.length<160)add(group.shift());
  return result;
 }
-export async function startResearch({store,key,enqueue,diversify=false}){
- const lease=await store.acquireCatalogLease();if(!lease)throw Error('RESEARCH_BUSY');
+export async function startResearch({store,key,enqueue,diversify=false,wait=ms=>new Promise(resolve=>setTimeout(resolve,ms))}){
+ // Queue sends are pinned to the sending deployment. A correction must acquire
+ // the shared checkpoint between steps and resume from the current deployment,
+ // rather than letting an old running worker overwrite the revised proposal.
+ let lease;
+ for(let attempt=0;attempt<60&&!lease;attempt++){
+  lease=await store.acquireCatalogLease();if(!lease)await wait(500);
+ }
+ if(!lease)throw Error('RESEARCH_BUSY');
  try{
   let previous=await store.getResearchRun();
   if(previous?.scope==='Black'&&previous.selected?.some(r=>!consistentPrices(r.history))){

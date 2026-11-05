@@ -82,3 +82,10 @@ test('inconsistent exact prices cannot create an implausibly tiny replacement bi
  await processResearchStep({run:'r',index:0},{key:'test',send:async()=>{},enqueue:async()=>{},store:{acquireCatalogLease:async()=>'lease',releaseCatalogLease:async()=>{},getResearchRun:async()=>run,saveResearchRun:async()=>{}},variantReader:async()=>({ok:true,complete:true,day:{count:2,q1:1.72},week:{count:16,q1:24.26,median:25.75}}),marketReader:async()=>{markets++;}});
  assert.equal(run.selected.length,0);assert.equal(markets,0);assert.equal(run.rejected[0].reason,'INCONSISTENT_EXACT_PRICES');
 });
+
+test('research revision waits for a safe checkpoint instead of racing the running worker',async()=>{
+ const {startResearch}=await import('./portfolio-research.js');let claims=0,waits=0,enqueued=0;
+ const run={scope:'Black',status:'running',id:'r',index:0,candidates:[],selected:[],collectionCaps:{'Chill Flame':3}};
+ const text=await startResearch({key:'test',wait:async()=>{waits++;},enqueue:async()=>{enqueued++;},store:{acquireCatalogLease:async()=>++claims<3?null:'lease',releaseCatalogLease:async token=>assert.equal(token,'lease'),getResearchRun:async()=>run}});
+ assert.equal(waits,2);assert.equal(enqueued,1);assert.match(text,/running/);
+});
