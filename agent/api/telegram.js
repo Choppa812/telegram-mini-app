@@ -14,7 +14,7 @@ import { readPositions,positionsText,readBlackModels,blackModelsText,modelMarket
 import { readCrossMarket,crossMarketText } from '../cross.js';
 import { readVariantLeads,variantLeadsText,readVariant,variantText } from '../variants.js';
 import { cleanBlackBatch } from '../trading.js';
-import { applyPortfolio, applyBasePortfolio, applyFullPortfolio, applyPrestige } from '../portfolio.js';
+import { applyPortfolio, applyBasePortfolio, applyFullPortfolio, applyPrestige, applyPortfolioSlot } from '../portfolio.js';
 import { applyCompetitive } from '../competitive-apply.js';
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
@@ -22,7 +22,7 @@ export default async function handler(req, res) {
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
     const context=runtime();
-    await handleCommand(body, { ...context, reviewCatalog:index=>catalogReview(index,{store:context.store,key:process.env.GIFT_SATELLITE_API_KEY,readProfile:()=>readSatellite('/user/me',{},process.env.GIFT_SATELLITE_API_KEY,'token')}), catalogAll:async()=>{const response=await fetch('https://gift-price-controller.vercel.app/api/catalog-worker',{method:'POST',headers:{Authorization:'Bearer '+process.env.CRON_SECRET,'Content-Type':'application/json'},body:'{}',signal:AbortSignal.timeout(12000)});if(!response.ok)throw new Error('SCAN_START_FAILED');const run=await context.store.getCatalogRun();return 'Сбор каталога: '+run.status+'; обработано '+run.checked+'/'+(run.total??'?')+'; неполных '+run.incomplete+'. Итог придёт после завершения. Слоты не меняются.';}, catalogScan:async index=>{
+    await handleCommand(body, { ...context, applyApproved:options=>{if(!process.env.PRIVATE_APPROVED_OVERRIDES)throw new Error('INVALID_PRIVATE_PORTFOLIO_PLAN');return applyPortfolioSlot(7,process.env.GIFT_SATELLITE_API_KEY,{...options,allowManualActivation:true});}, reviewCatalog:index=>catalogReview(index,{store:context.store,key:process.env.GIFT_SATELLITE_API_KEY,readProfile:()=>readSatellite('/user/me',{},process.env.GIFT_SATELLITE_API_KEY,'token')}), catalogAll:async()=>{const response=await fetch('https://gift-price-controller.vercel.app/api/catalog-worker',{method:'POST',headers:{Authorization:'Bearer '+process.env.CRON_SECRET,'Content-Type':'application/json'},body:'{}',signal:AbortSignal.timeout(12000)});if(!response.ok)throw new Error('SCAN_START_FAILED');const run=await context.store.getCatalogRun();return 'Сбор каталога: '+run.status+'; обработано '+run.checked+'/'+(run.total??'?')+'; неполных '+run.incomplete+'. Итог придёт после завершения. Слоты не меняются.';}, catalogScan:async index=>{
       const r=await scanCatalog(process.env.GIFT_SATELLITE_API_KEY,{offset:index,limit:1,maxPages:100,onCollection:row=>context.store.saveCatalogCollection(index,row)});
       const row=r.collections[0];
       if(!row)return 'Каталог завершён; индекс вне списка.';

@@ -208,3 +208,15 @@ test('Vercel KV integration variables are accepted without reading read-only cre
   assert.equal(await r.store.isPaused(),true);
   assert.equal(calls[0].headers.Authorization,'Bearer write-token');
 });
+
+test('approved activation is owner-only and rechecks pause immediately before writing',async()=>{
+  const s=setup();let calls=0,writes=0;
+  const deps={...s,applyApproved:async({beforeWrite})=>{calls++;s.state.paused=true;await beforeWrite();writes++;return {changed:true,price:14.95};}};
+  await handleCommand(update(1,'/applyapproved',7),deps);
+  await handleCommand(update(2,'/applyapproved'),deps);
+  assert.equal(calls,0);
+  s.state.paused=false;
+  await handleCommand(update(3,'/applyapproved'),deps);
+  assert.equal(calls,1);assert.equal(writes,0);
+  assert.match(s.messages.at(-1),/не завершена/);
+});

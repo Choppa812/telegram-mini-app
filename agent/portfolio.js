@@ -32,6 +32,8 @@ export function loadPortfolio(raw=process.env.PRIVATE_PORTFOLIO_PLAN) {
       throw new Error('INVALID_PRIVATE_PORTFOLIO_PLAN');
     slots.add(row.slot);
   }
+  const overrides=process.env.PRIVATE_APPROVED_OVERRIDES;
+  if(overrides){const extra=JSON.parse(overrides);if(!Array.isArray(extra)||extra.some(r=>r.slot!==7||r.original!=='Happy Brownie'||r.previousModel!=='Captain Flush'||r.collection!=='Trapped Heart'||r.model!=='Heartworm'||r.backdrop!=='Desert Sand'||r.ceiling!==15.5||r.minWeek!==8||r.manualActivation!==true||r.pricing!=='competitive'))throw new Error('INVALID_PRIVATE_PORTFOLIO_PLAN');for(const r of extra){const index=rows.findIndex(p=>p.slot===r.slot);if(index<0)throw new Error('INVALID_PRIVATE_PORTFOLIO_PLAN');rows[index]=r;}}
   return rows;
 }
 
