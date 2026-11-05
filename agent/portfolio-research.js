@@ -24,7 +24,7 @@ export async function startResearch({store,key,enqueue}){
   let previous=await store.getResearchRun();
   if(previous?.status==='running'){
    await store.releaseCatalogLease(lease);
-   await enqueue('catalog-scan',{kind:'research',run:previous.id,index:previous.index},{idempotencyKey:previous.id+':'+previous.index,retentionSeconds:604800});
+   await enqueue('catalog-scan',{kind:'research',run:previous.id,index:previous.index},{idempotencyKey:previous.id+':resume:'+previous.index+':'+Math.floor(Date.now()/60000),retentionSeconds:604800});
    return researchText(previous);
   }
   const catalog=await store.getCatalogRun();if(!catalog?.total)throw Error('NO_CATALOG');
@@ -84,3 +84,4 @@ export function researchText(run){
   'Покупка: 3%; продажа: резерв 2%; расчётный запас 1,5 TON. Это анализ; слоты не изменялись.'];
  return lines.join('\n');
 }
+
