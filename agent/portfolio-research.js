@@ -23,6 +23,7 @@ export async function startResearch({store,key,enqueue}){
  try{
   let previous=await store.getResearchRun();
   if(previous?.status==='running'){
+   await store.releaseCatalogLease(lease);
    await enqueue('catalog-scan',{kind:'research',run:previous.id,index:previous.index},{idempotencyKey:previous.id+':'+previous.index,retentionSeconds:604800});
    return researchText(previous);
   }
@@ -34,6 +35,7 @@ export async function startResearch({store,key,enqueue}){
   const run={id:randomUUID(),status:'running',startedAt:Date.now(),index:0,balance,slots:subs.data,
    candidates:researchCandidates(rows,balance,catalog.id,subs.data),selected:[],rejected:[]};
   await store.saveResearchRun(run);
+  await store.releaseCatalogLease(lease);
   await enqueue('catalog-scan',{kind:'research',run:run.id,index:0},{idempotencyKey:run.id+':0',retentionSeconds:604800});
   return researchText(run);
  }finally{await store.releaseCatalogLease(lease);}
@@ -64,7 +66,12 @@ export async function processResearchStep(message,{store,key,send,enqueue,varian
    await store.saveResearchRun(run);
    if(run.status!=='running'||run.index%10===0)try{await send(researchText(run));}catch{}
   }
-  if(run.status==='running')await enqueue('catalog-scan',{kind:'research',run:run.id,index:run.index},{idempotencyKey:run.id+':'+run.index,retentionSeconds:604800});
+  if(run.status==='running'){
+   // Release before publishing: fast delivery can otherwise collide with our
+   // own lease and impose a full queue retry interval on the following step.
+   await store.releaseCatalogLease(lease);
+   await enqueue('catalog-scan',{kind:'research',run:run.id,index:run.index},{idempotencyKey:run.id+':'+run.index,retentionSeconds:604800});
+  }
  }finally{await store.releaseCatalogLease(lease);}
 }
 export function researchText(run){
