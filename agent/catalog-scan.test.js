@@ -21,7 +21,8 @@ test('scans all collections and includes Black, other backgrounds and unsold cat
 test('page cap and invalid dates never look like complete analysis',async()=>{
   const fetcher=async(url)=>({ok:true,json:async()=>url.pathname.endsWith('/gift/collections')?[{name:'Example'}]:
     url.pathname.includes('/gift/collection/')?{models:[],backdrops:[]}:
-    {content:Array.from({length:20},(_,i)=>({_id:String(i),soldAt:new Date().toISOString(),modelName:'Model',backdropName:'Black',normalizedPrice:10}))}});
-  const r=await scanCatalog('secret',{fetcher,pause:async()=>{},maxPages:1});
+    {content:Array.from({length:20},(_,i)=>({_id:String(i),soldAt:'2026-11-04T00:00:00.000Z',modelName:'Model',backdropName:'Black',normalizedPrice:10}))}});
+  const r=await scanCatalog('secret',{fetcher,pause:async()=>{},maxPages:1,now:Date.parse('2026-11-04T01:00:00Z')});
   assert.equal(r.complete,false);assert.equal(r.collections[0].error,'PAGE_LIMIT_REACHED');
 });
+
