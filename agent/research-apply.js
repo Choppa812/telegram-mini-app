@@ -14,7 +14,7 @@ export function assignResearchSlots(selected,slots){
   slot=slot||free.shift();
   const replaces=Object.fromEntries(['collectionName','modelNames','backdropNames','portalsAutobuy','portalsAutobuyQuantity','portalsAutobuyMaxPrice'].filter(k=>slot[k]!==undefined).map(k=>[k,slot[k]]));
   return {slot:slots.indexOf(slot)+1,subscriptionId:slot._id,original:slot.collectionName,
-   collection:row.collection,model:row.model,backdrop:row.backdrop,ceiling:row.ceiling,minWeek:8,pricing:'competitive',manualActivation:true,replaces};
+   collection:row.collection,model:row.model,backdrop:row.backdrop,ceiling:row.ceiling,minDay:3,minWeek:8,pricing:'competitive',manualActivation:true,replaces};
  }).sort((a,b)=>a.slot-b.slot);
 }
 export async function startResearchApply({store,key,enqueue}){
@@ -23,7 +23,8 @@ export async function startResearchApply({store,key,enqueue}){
   if(await store.isPaused())return 'Автонастройка на паузе. Слоты не менялись.';
   const existing=await store.getActiveResearchPlan();
   if(existing?.status==='applying'){
-   await enqueue('catalog-scan',{kind:'research-apply',run:existing.id,index:existing.index},{idempotencyKey:'apply:'+existing.id+':'+existing.index,retentionSeconds:604800});
+   await store.releaseCatalogLease(lease);
+   await enqueue('catalog-scan',{kind:'research-apply',run:existing.id,index:existing.index},{idempotencyKey:'apply:'+existing.id+':resume:'+existing.index+':'+Math.floor(Date.now()/60000),retentionSeconds:604800});
    return 'Применение полного портфеля уже выполняется.';
   }
   const research=await store.getResearchRun();
@@ -36,6 +37,7 @@ export async function startResearchApply({store,key,enqueue}){
   // Publish the canonical plan before the first financial write. Daily uses it
   // instead of the legacy environment plan, so it cannot restore old models.
   await store.saveActiveResearchPlan(plan);
+  await store.releaseCatalogLease(lease);
   await enqueue('catalog-scan',{kind:'research-apply',run:plan.id,index:0},{idempotencyKey:'apply:'+plan.id+':0',retentionSeconds:604800});
   return 'Запущено применение 28 слотов. Перед каждой записью заново проверяются рынок, баланс и пауза; результат читается из API.';
  }finally{await store.releaseCatalogLease(lease);}
@@ -56,6 +58,9 @@ export async function processResearchApply(message,{store,key,send,enqueue,apply
     await send(`Полный портфель: проверено 28 слотов; активных совпадений ${active??'не удалось проверить'}/28. Изменено ${plan.results.filter(r=>r.changed).length}. /positions — фактические настройки. Лимиты пересчитаны по рынку и проверены API.`);
    }
   }
-  if(plan.status==='applying')await enqueue('catalog-scan',{kind:'research-apply',run:plan.id,index:plan.index},{idempotencyKey:'apply:'+plan.id+':'+plan.index,retentionSeconds:604800});
+  if(plan.status==='applying'){
+   await store.releaseCatalogLease(lease);
+   await enqueue('catalog-scan',{kind:'research-apply',run:plan.id,index:plan.index},{idempotencyKey:'apply:'+plan.id+':'+plan.index,retentionSeconds:604800});
+  }
  }finally{await store.releaseCatalogLease(lease);}
 }

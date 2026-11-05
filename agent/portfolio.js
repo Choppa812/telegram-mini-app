@@ -79,7 +79,7 @@ export async function applyPortfolioSlot(slotNumber, key, {
   if(slot.portalsAutobuyQuantity>1)throw new Error('SLOT_QUANTITY_CHANGED');
   const history=await variantReader(plan.collection,plan.model,backdrop,key,{fetcher,pause,maxPages:100});
   if(!history?.ok||!history.complete)throw new Error('EXACT_SALES_UNAVAILABLE');
-  if(history.week.count<plan.minWeek||history.day.count<2||!Number.isFinite(history.week.q1)||
+  if(history.week.count<plan.minWeek||history.day.count<(plan.minDay||2)||!Number.isFinite(history.week.q1)||
      (plan.pricing==='competitive'&&!Number.isFinite(history.day.q1))){
     if(slot.portalsAutobuy!==true)return {slot:slotNumber,changed:false,reason:'INSUFFICIENT_EXACT_SALES'};
     const body=subscriptionBody(slot,{models:[plan.model]},slot.portalsAutobuyMaxPrice);

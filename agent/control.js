@@ -187,6 +187,9 @@ export async function handleCommand(update, { ownerId, store, send, checkApi, ma
   } else if (command === '/pause' || command === '/resume') {
     const applied = await store.command(update.update_id, command === '/pause');
     const paused = await store.isPaused();
+    if(applied&&!paused&&(await store.getActiveResearchPlan?.())?.status==='applying'){
+      try{await applyResearch?.();}catch{await send('Не удалось продолжить применение портфеля. Повторите /applyresearch28.');}
+    }
     await send(applied ? (paused ? STOP_NOTICE : 'Автонастройка разрешена. Следующая проверка — по ежедневному расписанию Vercel.') : `Повторная или устаревшая команда пропущена. Автонастройка ${paused ? 'на паузе' : 'разрешена'}.`);
   } else if (command === '/report') {
     await send(reportText(await store.getReport()));
