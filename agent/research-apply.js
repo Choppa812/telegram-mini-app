@@ -10,7 +10,8 @@ export function assignResearchSlots(selected,slots){
   const exact=slots.find(s=>!used.has(s._id)&&fits(s,row));
   if(exact){used.add(exact._id);assigned.push({row,slot:exact});}else assigned.push({row});
  }
- const free=slots.filter(s=>!used.has(s._id)).sort((a,b)=>Number(a.portalsAutobuy===true)-Number(b.portalsAutobuy===true));
+ const priority=s=>same(s.backdropNames,['Black'])?(s.portalsAutobuy===true?2:1):0;
+ const free=slots.filter(s=>!used.has(s._id)).sort((a,b)=>priority(a)-priority(b));
  return assigned.map(({row,slot})=>{
   slot=slot||free.shift();
   const replaces=Object.fromEntries(['collectionName','modelNames','backdropNames','portalsAutobuy','portalsAutobuyQuantity','portalsAutobuyMaxPrice'].filter(k=>slot[k]!==undefined).map(k=>[k,slot[k]]));
