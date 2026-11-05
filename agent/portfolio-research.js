@@ -6,6 +6,12 @@ import { competitivePrice } from './competitive.js';
 import { scanCatalog } from './catalog-scan.js';
 
 const identity=r=>JSON.stringify([r.collection,r.model,r.backdrop]);
+export function diversifySelection(rows,collection='Chill Flame',limit=3){
+ const retained=new Set(rows.filter(r=>r.collection===collection)
+  .sort((a,b)=>b.history.day.count-a.history.day.count||b.history.week.count-a.history.week.count)
+  .slice(0,limit).map(identity));
+ return rows.filter(r=>r.collection!==collection||retained.has(identity(r)));
+}
 export function researchCandidates(rows,balance,runId,slots){
  // Discovery may use a partial observation. Every proposed bid still needs
  // complete exact-model history with multiple daily and weekly sales below.
@@ -23,10 +29,19 @@ export function researchCandidates(rows,balance,runId,slots){
   for(const group of groups.values())if(group.length&&result.length<160)add(group.shift());
  return result;
 }
-export async function startResearch({store,key,enqueue}){
+export async function startResearch({store,key,enqueue,diversify=false}){
  const lease=await store.acquireCatalogLease();if(!lease)throw Error('RESEARCH_BUSY');
  try{
   let previous=await store.getResearchRun();
+  if(diversify&&previous?.scope==='Black'&&previous.selected?.length&&previous.collectionCaps?.['Chill Flame']!==3){
+   const profile=await readSatellite('/user/me',{},key,'token');
+   const balance=Number(profile.data?.tonBalance);
+   if(!profile.ok||!Number.isFinite(balance)||balance<=0)throw Error('INVALID_BALANCE');
+   previous={...previous,id:randomUUID(),balance,revisedAt:Date.now(),collectionCaps:{'Chill Flame':3},selected:diversifySelection(previous.selected).filter(r=>r.ceiling*1.03<=balance)};
+   previous.status=previous.index<previous.candidates.length?'running':(previous.discoveryIndex??0)<(previous.discoveryTotal??132)?'discovering':'insufficient';
+   previous.discoveryIndex??=0;
+   await store.saveResearchRun(previous);
+  }
   if(previous?.status==='insufficient'&&previous.scope==='Black'&&previous.discoveryIndex===undefined){
    previous.status='discovering';previous.discoveryIndex=0;await store.saveResearchRun(previous);
   }
@@ -41,7 +56,7 @@ export async function startResearch({store,key,enqueue}){
   const balance=Number(profile.data.tonBalance);if(!Number.isFinite(balance)||balance<=0)throw Error('INVALID_BALANCE');
   const rows=await store.getCatalogRows(catalog.total);
   const run={id:randomUUID(),scope:'Black',status:'running',startedAt:Date.now(),index:0,balance,slots:subs.data,
-   candidates:researchCandidates(rows,balance,catalog.id,subs.data),selected:[],rejected:[]};
+   candidates:researchCandidates(rows,balance,catalog.id,subs.data),selected:[],rejected:[],collectionCaps:{'Chill Flame':3}};
   if(!run.candidates.length){run.status='discovering';run.discoveryIndex=0;}
   await store.saveResearchRun(run);
   await store.releaseCatalogLease(lease);
@@ -76,10 +91,14 @@ export async function processResearchStep(message,{store,key,send,enqueue,varian
    if(!candidate)throw Error('EMPTY_RESEARCH');
    const {collection,model,backdrop}=candidate;
    if(backdrop!=='Black')throw Error('BLACK_ONLY_RESEARCH');
+   const cap=run.collectionCaps?.[collection];
+   let reason='INSUFFICIENT_EXACT_SALES',selected;
+   if(cap!==undefined&&run.selected.filter(r=>r.collection===collection).length>=cap){
+    reason='COLLECTION_LIMIT';
+   }else{
    let history;
    try{history=await variantReader(collection,model,backdrop,key,{maxPages:100});}
    catch(error){if(error.message==='INVALID_VARIANT_REQUEST')history={ok:false,complete:false};else throw error;}
-   let reason='INSUFFICIENT_EXACT_SALES',selected;
    if(history.ok&&history.complete&&history.day.count>=2&&history.week.count>=8&&history.day.q1>0&&history.week.q1>0){
     const market=await marketReader(collection,key,undefined,undefined,backdrop,model);
     const floors=(market.rows||[]).map(r=>r.floor).filter(f=>Number.isFinite(f)&&f>0);
@@ -89,6 +108,7 @@ export async function processResearchStep(message,{store,key,send,enqueue,varian
      reason='NO_POSITIVE_MARGIN';
      if(price>0&&price*1.03<=run.balance)selected={collection,model,backdrop,ceiling:price,minWeek:8,pricing:'competitive',history,market,checkedAt:Date.now()};
     }
+   }
    }
    if(selected)run.selected.push(selected);else run.rejected.push({collection,model,backdrop,reason});
    run.index++;
@@ -111,10 +131,12 @@ export async function processResearchStep(message,{store,key,send,enqueue,varian
 export function researchText(run){
  if(!run)return 'Подбор портфеля ещё не запущен.';
  const lines=[`Подбор 28 слотов только Black: ${run.status}; проверено ${run.index}/${run.candidates.length}; подтверждено ${run.selected.length}/28.`,
+  ...(run.collectionCaps?.['Chill Flame']===3?['Chill Flame: максимум 3 слота; остальные — другие коллекции.']:[]),
   ...(run.discoveryIndex!==undefined?[`Дополнительный сбор Black: ${run.discoveryIndex}/${run.discoveryTotal??132} коллекций.`]:[]),
   ...(run.status==='running'?[`Следующий: ${run.candidates[run.index]?.collection} / ${run.candidates[run.index]?.model} / ${run.candidates[run.index]?.backdrop}.`]:[]),
   ...run.selected.map((r,i)=>`${i+1}. ${r.collection} / ${r.model} / ${r.backdrop}: до ${r.ceiling.toFixed(2)} TON; ${r.history.day.count}/${r.history.week.count} продаж.`),
   'Требуется полная точная история: минимум 2 продажи за сутки и 8 за неделю. Покупка: 3%; продажа: резерв 2%; расчётный запас 1,5 TON. Это анализ; слоты не изменялись.'];
  return lines.join('\n');
 }
+
 
