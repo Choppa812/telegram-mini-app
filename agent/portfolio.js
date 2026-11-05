@@ -77,7 +77,7 @@ export async function applyPortfolioSlot(slotNumber, key, {
   if(slot.portalsAutobuy===true&&slot.collectionName!==plan.collection&&!approvedReplacement)throw new Error('SLOT_ALREADY_ACTIVE');
   if(slot.portalsAutobuy===true&&!same(slot.modelNames,[plan.model])&&!approvedReplacement)throw new Error('ACTIVE_MODELS_CHANGED');
   if(slot.portalsAutobuyQuantity>1)throw new Error('SLOT_QUANTITY_CHANGED');
-  const history=await variantReader(plan.collection,plan.model,backdrop,key,{fetcher,pause});
+  const history=await variantReader(plan.collection,plan.model,backdrop,key,{fetcher,pause,maxPages:100});
   if(!history?.ok||!history.complete)throw new Error('EXACT_SALES_UNAVAILABLE');
   if(history.week.count<plan.minWeek||history.day.count<2||!Number.isFinite(history.week.q1)||
      (plan.pricing==='competitive'&&!Number.isFinite(history.day.q1))){
@@ -187,3 +187,4 @@ export async function applyPrestige(key, options={}) {
   }
   return result;
 }
+
