@@ -26,6 +26,9 @@ export function runtime(env = process.env, fetcher = fetch) {
     acquireCatalogLease: async () => {const token=randomUUID();return await redis('SET',prefix+'catalog-lease',token,'NX','EX','330')?token:null;},
     releaseCatalogLease: token=>redis('EVAL',"if redis.call('GET',KEYS[1])==ARGV[1] then return redis.call('DEL',KEYS[1]) end; return 0",1,prefix+'catalog-lease',token),
     getCatalogRun: async () => decode(await redis('GET',prefix+'catalog-run')),
+    getCatalogRows: async total=>{
+      const rows=[];for(let i=0;i<total;i+=4){const values=await redis('MGET',...Array.from({length:Math.min(4,total-i)},(_,j)=>prefix+'catalog:'+(i+j)));rows.push(...values.map(decode));}return rows;
+    },
     saveCatalogRun: row => redis('SET',prefix+'catalog-run',JSON.stringify(row),'EX','604800'),
     claimCatalogStep: (run,index) => redis('SET',prefix+'catalog-step:'+run+':'+index,'1','NX','EX','604800'),
     saveCatalogCollection: (index,row) => redis('SET', prefix+'catalog:'+index, JSON.stringify(row), 'EX','604800'),
