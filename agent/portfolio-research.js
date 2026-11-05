@@ -48,7 +48,9 @@ export async function processResearchStep(message,{store,key,send,enqueue,varian
    const candidate=run.candidates[run.index];
    if(!candidate)throw Error('EMPTY_RESEARCH');
    const {collection,model,backdrop}=candidate;
-   const history=await variantReader(collection,model,backdrop,key,{maxPages:100});
+   let history;
+   try{history=await variantReader(collection,model,backdrop,key,{maxPages:100});}
+   catch(error){if(error.message==='INVALID_VARIANT_REQUEST')history={ok:false,complete:false};else throw error;}
    let reason='INSUFFICIENT_EXACT_SALES',selected;
    if(history.ok&&history.complete&&history.day.count>=3&&history.week.count>=8&&history.day.q1>0&&history.week.q1>0){
     const market=await marketReader(collection,key,undefined,undefined,backdrop,model);
@@ -77,6 +79,7 @@ export async function processResearchStep(message,{store,key,send,enqueue,varian
 export function researchText(run){
  if(!run)return 'Подбор портфеля ещё не запущен.';
  const lines=[`Подбор 28 слотов: ${run.status}; проверено ${run.index}/${run.candidates.length}; подтверждено ${run.selected.length}/28.`,
+  ...(run.status==='running'?[`Следующий: ${run.candidates[run.index]?.collection} / ${run.candidates[run.index]?.model} / ${run.candidates[run.index]?.backdrop}.`]:[]),
   ...run.selected.map((r,i)=>`${i+1}. ${r.collection} / ${r.model} / ${r.backdrop}: до ${r.ceiling.toFixed(2)} TON; ${r.history.day.count}/${r.history.week.count} продаж.`),
   'Покупка: 3%; продажа: резерв 2%; расчётный запас 1,5 TON. Это анализ; слоты не изменялись.'];
  return lines.join('\n');

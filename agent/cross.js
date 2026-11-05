@@ -3,9 +3,9 @@ const MARKETS = ['tg', 'portals', 'tonnel', 'mrkt', 'getgems'];
 import { fetchReadWithRetry } from './read-retry.js';
 
 export async function readCrossMarket(collection, key, fetcher = fetch, pause = ms => new Promise(resolve => setTimeout(resolve, ms)), backdrop = 'Black', model = '') {
-  if (typeof collection !== 'string' || !/^[\p{L}\p{N} .'-]{2,80}$/u.test(collection) || !key) throw new Error('INVALID_CROSS_REQUEST');
-  if (typeof backdrop !== 'string' || !/^[\p{L}\p{N} .'-]{2,80}$/u.test(backdrop)) throw new Error('INVALID_BACKDROP');
-  if (model && (typeof model !== 'string' || !/^[\p{L}\p{N} .!'-]{2,80}$/u.test(model))) throw new Error('INVALID_MODEL');
+  if (typeof collection !== 'string' || !/^[^\p{C}\\/]{1,80}$/u.test(collection) || !key) throw new Error('INVALID_CROSS_REQUEST');
+  if (typeof backdrop !== 'string' || !/^[^\p{C}\\/]{1,80}$/u.test(backdrop)) throw new Error('INVALID_BACKDROP');
+  if (model && (typeof model !== 'string' || !/^[^\p{C}\\/]{1,80}$/u.test(model))) throw new Error('INVALID_MODEL');
   const rows = [];
   for (const market of MARKETS) {
     const url = new URL(`${BASE}/search/${market}/${encodeURIComponent(collection)}`);

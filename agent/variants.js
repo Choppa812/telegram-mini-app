@@ -1,6 +1,6 @@
 const BASE = 'https://gift-satellite.dev/api';
 import { fetchReadWithRetry } from './read-retry.js';
-const validName = value => typeof value === 'string' && /^[\p{L}\p{N} .!'-]{2,80}$/u.test(value);
+const validName = value => typeof value === 'string' && /^[^\p{C}\\/]{1,80}$/u.test(value);
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 async function history(collection, key, { model, backdrop, days, maxPages = 12, fetcher = fetch, pause = wait }) {

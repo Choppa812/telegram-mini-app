@@ -24,3 +24,13 @@ test('incomplete exact history never produces a proposed purchase',async()=>{
  assert.equal(run.status,'insufficient');assert.equal(run.selected.length,0);
 });
 
+
+ test('catalog model names with punctuation are encoded and control characters are rejected',async()=>{
+ const {readVariant}=await import('./variants.js');
+ let calls=0;
+ const result=await readVariant('Gift','Model (OG)','Blue: Grey','test',{pause:async()=>{},fetcher:async(url,options)=>{
+ calls++;assert.equal(JSON.parse(options.body).models[0],'Model (OG)');return {ok:true,json:async()=>({content:[]})};
+ }});
+ assert.equal(result.complete,true);assert.equal(calls,1);
+ await assert.rejects(readVariant('Gift','bad\nmodel','Black','test'),/INVALID_VARIANT_REQUEST/);
+ });
