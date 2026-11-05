@@ -23,7 +23,8 @@ export async function startResearch({store,key,enqueue}){
  try{
   let previous=await store.getResearchRun();
   if(previous?.status==='running'){
-   await enqueue('catalog-scan',{kind:'research',run:previous.id,index:previous.index},{idempotencyKey:previous.id+':'+previous.index,retentionSeconds:604800});
+   await store.releaseCatalogLease(lease);
+   await enqueue('catalog-scan',{kind:'research',run:previous.id,index:previous.index},{idempotencyKey:previous.id+':resume:'+previous.index+':'+Math.floor(Date.now()/60000),retentionSeconds:604800});
    return researchText(previous);
   }
   const catalog=await store.getCatalogRun();if(!catalog?.total)throw Error('NO_CATALOG');
@@ -34,6 +35,7 @@ export async function startResearch({store,key,enqueue}){
   const run={id:randomUUID(),status:'running',startedAt:Date.now(),index:0,balance,slots:subs.data,
    candidates:researchCandidates(rows,balance,catalog.id,subs.data),selected:[],rejected:[]};
   await store.saveResearchRun(run);
+  await store.releaseCatalogLease(lease);
   await enqueue('catalog-scan',{kind:'research',run:run.id,index:0},{idempotencyKey:run.id+':0',retentionSeconds:604800});
   return researchText(run);
  }finally{await store.releaseCatalogLease(lease);}
@@ -46,7 +48,9 @@ export async function processResearchStep(message,{store,key,send,enqueue,varian
    const candidate=run.candidates[run.index];
    if(!candidate)throw Error('EMPTY_RESEARCH');
    const {collection,model,backdrop}=candidate;
-   const history=await variantReader(collection,model,backdrop,key,{maxPages:100});
+   let history;
+   try{history=await variantReader(collection,model,backdrop,key,{maxPages:100});}
+   catch(error){if(error.message==='INVALID_VARIANT_REQUEST')history={ok:false,complete:false};else throw error;}
    let reason='INSUFFICIENT_EXACT_SALES',selected;
    if(history.ok&&history.complete&&history.day.count>=3&&history.week.count>=8&&history.day.q1>0&&history.week.q1>0){
     const market=await marketReader(collection,key,undefined,undefined,backdrop,model);
@@ -64,13 +68,20 @@ export async function processResearchStep(message,{store,key,send,enqueue,varian
    await store.saveResearchRun(run);
    if(run.status!=='running'||run.index%10===0)try{await send(researchText(run));}catch{}
   }
-  if(run.status==='running')await enqueue('catalog-scan',{kind:'research',run:run.id,index:run.index},{idempotencyKey:run.id+':'+run.index,retentionSeconds:604800});
+  if(run.status==='running'){
+   // Release before publishing: fast delivery can otherwise collide with our
+   // own lease and impose a full queue retry interval on the following step.
+   await store.releaseCatalogLease(lease);
+   await enqueue('catalog-scan',{kind:'research',run:run.id,index:run.index},{idempotencyKey:run.id+':'+run.index,retentionSeconds:604800});
+  }
  }finally{await store.releaseCatalogLease(lease);}
 }
 export function researchText(run){
  if(!run)return 'Подбор портфеля ещё не запущен.';
  const lines=[`Подбор 28 слотов: ${run.status}; проверено ${run.index}/${run.candidates.length}; подтверждено ${run.selected.length}/28.`,
+  ...(run.status==='running'?[`Следующий: ${run.candidates[run.index]?.collection} / ${run.candidates[run.index]?.model} / ${run.candidates[run.index]?.backdrop}.`]:[]),
   ...run.selected.map((r,i)=>`${i+1}. ${r.collection} / ${r.model} / ${r.backdrop}: до ${r.ceiling.toFixed(2)} TON; ${r.history.day.count}/${r.history.week.count} продаж.`),
   'Покупка: 3%; продажа: резерв 2%; расчётный запас 1,5 TON. Это анализ; слоты не изменялись.'];
  return lines.join('\n');
 }
+
