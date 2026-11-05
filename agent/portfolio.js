@@ -83,11 +83,11 @@ export async function applyPortfolioSlot(slotNumber, key, {
   if(history.week.count<plan.minWeek||history.day.count<(plan.minDay||2)||!Number.isFinite(history.week.q1)||
      (plan.pricing==='competitive'&&!Number.isFinite(history.day.q1))){
     if(slot.portalsAutobuy!==true)return {slot:slotNumber,changed:false,reason:'INSUFFICIENT_EXACT_SALES'};
-    const body=subscriptionBody(slot,{models:[plan.model]},slot.portalsAutobuyMaxPrice);
-    Object.assign(body,{backdropNames:[backdrop],portalsAutobuy:false,portalsAutobuyQuantity:0,autobuyTg:false,autobuyPortals:false,autobuyTonnel:false,autobuyMrkt:false});
+    const body=subscriptionBody(slot,{models:slot.modelNames||[]},slot.portalsAutobuyMaxPrice);
+    Object.assign(body,{backdropNames:slot.backdropNames||[],portalsAutobuy:false,portalsAutobuyQuantity:0,autobuyTg:false,autobuyPortals:false,autobuyTonnel:false,autobuyMrkt:false});
     const latest=await readSatellite('/user/subscriptions',{},key,'token',fetcher);
     const current=latest.ok&&Array.isArray(latest.data)?latest.data.find(item=>item._id===slot._id):null;
-    if(!current||current._id!==slot._id||current.portalsAutobuy!==true||!same(current.modelNames,[plan.model]))throw new Error('SLOT_CHANGED_DURING_ANALYSIS');
+    if(!current||current._id!==slot._id||current.portalsAutobuy!==true||current.collectionName!==slot.collectionName||!same(current.modelNames,slot.modelNames)||!same(current.backdropNames,slot.backdropNames)||current.portalsAutobuyQuantity!==slot.portalsAutobuyQuantity||Number(current.portalsAutobuyMaxPrice)!==Number(slot.portalsAutobuyMaxPrice))throw new Error('SLOT_CHANGED_DURING_ANALYSIS');
     await beforeWrite();
     await writeSubscription(slot._id,body,key,fetcher);
     await pause(600);

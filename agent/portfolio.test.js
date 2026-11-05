@@ -127,3 +127,15 @@ test('legacy colored plans cannot be activated even with manual activation allow
  await assert.rejects(applyPortfolioSlot(3,'test',{...f,allowManualActivation:true,beforeWrite:async()=>{}}),/BLACK_ONLY_PLAN_REQUIRED/);
  assert.equal(f.writes.length,0);
 });
+
+test('a weak replacement disables the previous colored order without mixing collections and models',async()=>{
+ const f=fixture(),old=f.state[2];
+ Object.assign(old,{portalsAutobuy:true,portalsAutobuyQuantity:1,portalsAutobuyMaxPrice:12,modelNames:['Previous model'],backdropNames:['Desert Sand']});
+ const replaces=Object.fromEntries(['collectionName','modelNames','backdropNames','portalsAutobuy','portalsAutobuyQuantity','portalsAutobuyMaxPrice'].map(k=>[k,old[k]]));
+ f.portfolio=[{...TEST_PLAN[0],subscriptionId:old._id,replaces}];
+ f.variantReader=async()=>({ok:true,complete:true,day:{count:0,q1:null},week:{count:0,q1:null}});
+ const result=await applyPortfolioSlot(3,'test',{...f,allowApprovedReplacement:true,beforeWrite:async()=>{}});
+ assert.equal(result.disabled,true);assert.equal(f.writes.length,1);
+ assert.equal(f.state[2].collectionName,'Unused');assert.deepEqual(f.state[2].modelNames,['Previous model']);
+ assert.deepEqual(f.state[2].backdropNames,['Desert Sand']);assert.equal(f.state[2].portalsAutobuy,false);
+});

@@ -32,3 +32,17 @@ test('activation refuses the superseded plan with more than three Chill Flame sl
  const slots=Array.from({length:28},(_,i)=>({_id:String(i)}));
  assert.throws(()=>assignResearchSlots(selected,slots),/COLLECTION_LIMIT/);
 });
+
+test('an unverified attempt is blocked rather than re-arming the order on queue retry',async()=>{
+ const plan={id:'r',status:'applying',index:0,rows:[{slot:7}],results:[]};let attempts=0,reports=0;
+ const deps={store:{acquireCatalogLease:async()=>'lease',releaseCatalogLease:async()=>{},getActiveResearchPlan:async()=>plan,isPaused:async()=>false,saveActiveResearchPlan:async()=>{}},send:async()=>{reports++;},enqueue:async()=>{throw Error('must not enqueue');},apply:async()=>{attempts++;throw Error('PORTFOLIO_WRITE_NOT_VERIFIED');}};
+ await processResearchApply({run:'r',index:0},deps);
+ await processResearchApply({run:'r',index:0},deps);
+ assert.equal(attempts,1);assert.equal(reports,1);assert.equal(plan.status,'blocked');assert.equal(plan.failedSlot,7);
+});
+
+test('an interrupted in-flight operation is never executed a second time',async()=>{
+ const plan={id:'r',status:'applying',index:0,inFlight:0,rows:[{slot:7}],results:[]};let attempts=0;
+ await processResearchApply({run:'r',index:0},{store:{acquireCatalogLease:async()=>'lease',releaseCatalogLease:async()=>{},getActiveResearchPlan:async()=>plan,isPaused:async()=>false,saveActiveResearchPlan:async()=>{}},send:async()=>{},apply:async()=>{attempts++;}});
+ assert.equal(attempts,0);assert.equal(plan.status,'blocked');
+});

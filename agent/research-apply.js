@@ -25,13 +25,17 @@ export async function startResearchApply({store,key,enqueue}){
  try{
   if(await store.isPaused())return 'Автонастройка на паузе. Слоты не менялись.';
   const existing=await store.getActiveResearchPlan();
+  if(existing?.status==='blocked')return `Применение остановлено на слоте ${existing.failedSlot??'?'}. Повторная запись заблокирована до проверки фактического состояния через API. /positions — текущие настройки.`;
   if(existing?.status==='applying'){
    await store.releaseCatalogLease(lease);
    await enqueue('catalog-scan',{kind:'research-apply',run:existing.id,index:existing.index},{idempotencyKey:'apply:'+existing.id+':resume:'+existing.index+':'+Math.floor(Date.now()/60000),retentionSeconds:604800});
    return 'Применение полного портфеля уже выполняется.';
   }
   const research=await store.getResearchRun();
-  if(research?.scope!=='Black'||research?.collectionCaps?.['Chill Flame']!==3||research?.status!=='completed'||research.selected?.length!==28||Date.now()-research.startedAt>21600000)throw Error('FRESH_FULL_RESEARCH_REQUIRED');
+  // The approved composition and ceilings remain fixed. Fresh complete sales,
+  // offers and account balance are required by applyPortfolioSlot before EVERY
+  // write, including when the owner activates a morning plan in the evening.
+  if(research?.scope!=='Black'||research?.collectionCaps?.['Chill Flame']!==3||research?.status!=='completed'||research.selected?.length!==28)throw Error('FRESH_FULL_RESEARCH_REQUIRED');
   if(existing?.id===research.id)return 'Этот портфель уже применён. Проверьте /positions.';
   const response=await readSatellite('/user/subscriptions',{},key,'token');
   if(!response.ok||!Array.isArray(response.data))throw Error('ACCOUNT_READ_FAILED');
@@ -52,7 +56,21 @@ export async function processResearchApply(message,{store,key,send,enqueue,apply
   if(await store.isPaused())return;
   if(plan.index===message.index){
    const row=plan.rows[plan.index];
-   const result=await apply(row.slot,key,{portfolio:plan.rows,allowManualActivation:true,allowApprovedReplacement:true,beforeWrite:async()=>{if(await store.isPaused())throw Error('AUTOMATION_PAUSED');}});
+   const block=async()=>{
+    plan.status='blocked';plan.failedSlot=row.slot;await store.saveActiveResearchPlan(plan);
+    await send(`Применение остановлено на слоте ${row.slot}. Успешно проверено ранее: ${plan.results.length}. Результат текущей попытки требует чтения API; повторное включение не выполняется. /positions — фактические настройки.`);
+   };
+   if(plan.inFlight===plan.index){await block();return;}
+   // Persist before attempting the operation: a crash or unverified write must
+   // never silently re-arm an order which may already have bought one gift.
+   plan.inFlight=plan.index;await store.saveActiveResearchPlan(plan);
+   let result;
+   try{result=await apply(row.slot,key,{portfolio:plan.rows,allowManualActivation:true,allowApprovedReplacement:true,beforeWrite:async()=>{if(await store.isPaused())throw Error('AUTOMATION_PAUSED');}});}
+   catch(error){
+    if(error?.message==='AUTOMATION_PAUSED'){delete plan.inFlight;await store.saveActiveResearchPlan(plan);return;}
+    await block();return;
+   }
+   delete plan.inFlight;
    plan.results.push(result);plan.index++;plan.status=plan.index===28?'completed':'applying';
    await store.saveActiveResearchPlan(plan);
    if(plan.status==='completed'){
