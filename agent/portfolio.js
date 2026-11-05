@@ -52,7 +52,7 @@ function approvedSlotThreeReplacement(number, slot, plan) {
 
 export async function applyPortfolioSlot(slotNumber, key, {
   beforeWrite, fetcher=fetch, pause=ms=>new Promise(resolve=>setTimeout(resolve,ms)),
-  variantReader=readVariant, marketReader=readCrossMarket, portfolio=loadPortfolio(), allowManualActivation=false,
+  variantReader=readVariant, marketReader=readCrossMarket, portfolio=loadPortfolio(), allowManualActivation=false, allowApprovedReplacement=false,
 }={}) {
   const plan=portfolio.find(item=>item.slot===slotNumber);
   if(!plan||!key||typeof beforeWrite!=='function')throw new Error('PORTFOLIO_CONFIGURATION_MISSING');
@@ -65,12 +65,15 @@ export async function applyPortfolioSlot(slotNumber, key, {
   if(profileResponse.data?.isAutobuyEnabled!==true)throw new Error('GLOBAL_AUTOBUY_DISABLED');
   const exactMatches=slotsResponse.data.filter(item=>item.collectionName===plan.collection&&same(item.modelNames,[plan.model])&&same(item.backdropNames,[backdrop]));
   if(exactMatches.length>1)throw new Error('SLOT_CHANGED');
-  const slot=exactMatches[0]||slotsResponse.data[slotNumber-1];
+  const slot=plan.subscriptionId?slotsResponse.data.find(s=>s._id===plan.subscriptionId):exactMatches[0]||slotsResponse.data[slotNumber-1];
   const planned=slot?.collectionName===plan.collection&&same(slot.modelNames,[plan.model])&&same(slot.backdropNames,[backdrop]);
   const previous=slot?.collectionName===plan.original&&(!plan.previousModel||same(slot.modelNames,[plan.previousModel]));
   if(!slot||!planned&&!previous)throw new Error('SLOT_CHANGED');
   if(plan.manualActivation&&!planned&&!allowManualActivation)return {slot:slotNumber,changed:false,reason:'AWAITING_MANUAL_ACTIVATION'};
-  const approvedReplacement=approvedSlotThreeReplacement(slotNumber,slot,plan);
+  const replacementAllowed=current=>approvedSlotThreeReplacement(slotNumber,current,plan)||
+    (allowApprovedReplacement&&plan.subscriptionId===current?._id&&plan.replaces&&
+     Object.keys(plan.replaces).every(k=>same(plan.replaces[k],current[k])));
+  const approvedReplacement=replacementAllowed(slot);
   if(slot.portalsAutobuy===true&&slot.collectionName!==plan.collection&&!approvedReplacement)throw new Error('SLOT_ALREADY_ACTIVE');
   if(slot.portalsAutobuy===true&&!same(slot.modelNames,[plan.model])&&!approvedReplacement)throw new Error('ACTIVE_MODELS_CHANGED');
   if(slot.portalsAutobuyQuantity>1)throw new Error('SLOT_QUANTITY_CHANGED');
@@ -112,7 +115,7 @@ export async function applyPortfolioSlot(slotNumber, key, {
      !same(current.modelNames,slot.modelNames)||!same(current.backdropNames,slot.backdropNames)||
      current.portalsAutobuyQuantity!==slot.portalsAutobuyQuantity||
      Math.abs(Number(current.portalsAutobuyMaxPrice)-Number(slot.portalsAutobuyMaxPrice))>.001||
-     (approvedReplacement&&!approvedSlotThreeReplacement(slotNumber,current,plan)))throw new Error('SLOT_CHANGED_DURING_ANALYSIS');
+     (approvedReplacement&&!replacementAllowed(current)))throw new Error('SLOT_CHANGED_DURING_ANALYSIS');
   if(!Number.isFinite(balance))throw new Error('INVALID_BALANCE');
   if(balance<price*1.03)return {slot:slotNumber,changed:false,reason:'BALANCE_INSUFFICIENT_FOR_SINGLE_PURCHASE'};
   const body=subscriptionBody(current,{models:[plan.model]},price);

@@ -8,6 +8,11 @@ export function createDailyHandler({ notifyOnError = false } = {}) { return asyn
     const context=runtime();
     const result = await dailyReport({ ...context, notifyOnError, run: process.env.GIFT_SATELLITE_API_KEY ? async ({beforeWrite,onProgress}) => {
       const key=process.env.GIFT_SATELLITE_API_KEY;
+      const canonical=await context.store.getActiveResearchPlan();
+      if(canonical){
+        if(canonical.status!=='completed')throw Error('INITIAL_APPLY_RUNNING');
+        return {status:'completed',...await applyPortfolio(key,{portfolio:canonical.rows,beforeWrite,onProgress})};
+      }
       const existing=await applyBasePortfolio(key,{beforeWrite,onProgress});
       if(!await context.store.isPortfolioEnabled())return {status:'completed',...existing};
       const additions=await applyPortfolio(key,{beforeWrite,onProgress:progress=>onProgress({checked:existing.checked+progress.checked,changed:existing.changed+progress.changed,skipped:existing.skipped+progress.skipped,details:[...existing.details,...progress.details]})});

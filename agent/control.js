@@ -27,13 +27,20 @@ export function reportText(report) {
   ].filter(Boolean).join('\n');
 }
 
-export async function handleCommand(update, { ownerId, store, send, checkApi, marketOverview, floorOverview, highBlackFloors, inspectGift, feeOverview, turnoverOverview, blackDailySales, blackScan, positionsOverview, blackModels, modelMarkets, crossMarket, variantLeads, variantDetail, variantCross, applyBlack, apply28, applyAll, applyCompetitive, applyPrestige, cleanBlack, catalogScan, catalogAll, reviewCatalog, applyApproved, research28, researchStatus }) {
+export async function handleCommand(update, { ownerId, store, send, checkApi, marketOverview, floorOverview, highBlackFloors, inspectGift, feeOverview, turnoverOverview, blackDailySales, blackScan, positionsOverview, blackModels, modelMarkets, crossMarket, variantLeads, variantDetail, variantCross, applyBlack, apply28, applyAll, applyCompetitive, applyPrestige, cleanBlack, catalogScan, catalogAll, reviewCatalog, applyApproved, research28, researchStatus, applyResearch }) {
   const m = update?.message;
   if (!ownerId || m?.chat?.type !== 'private' || String(m?.from?.id) !== String(ownerId) || String(m?.chat?.id) !== String(ownerId)) return false;
   const command = (m.text || '').trim().split(/\s/)[0].split('@')[0].toLowerCase();
-  if (!['/start', '/help', '/status', '/report', '/pause', '/resume', '/checkapi', '/market', '/floors', '/highfloors', '/inspect', '/fees', '/rank', '/blackday', '/blackscan', '/blackscan90', '/positions', '/models', '/marketsales', '/cross', '/variants', '/variant', '/variantcross', '/applyblack', '/apply28', '/applyall', '/applycompetitive', '/applyprestige', '/blackclean', '/catalogscan', '/catalogall', '/catalogreport', '/catalogreview', '/applyapproved', '/research28', '/researchstatus'].includes(command)) return false;
+  if (!['/start', '/help', '/status', '/report', '/pause', '/resume', '/checkapi', '/market', '/floors', '/highfloors', '/inspect', '/fees', '/rank', '/blackday', '/blackscan', '/blackscan90', '/positions', '/models', '/marketsales', '/cross', '/variants', '/variant', '/variantcross', '/applyblack', '/apply28', '/applyall', '/applycompetitive', '/applyprestige', '/blackclean', '/catalogscan', '/catalogall', '/catalogreport', '/catalogreview', '/applyapproved', '/research28', '/researchstatus', '/applyresearch28'].includes(command)) return false;
   if (!Number.isSafeInteger(update.update_id)) return false;
-  if(command==='/research28'||command==='/researchstatus'){
+  if(['/applyapproved','/applyblack','/apply28','/applyall','/applycompetitive','/applyprestige','/blackclean'].includes(command)&&await store.getActiveResearchPlan?.()){
+    await send('Для аккаунта опубликован новый полный портфель. Старые команды не применяются; /positions — текущие настройки, /applyresearch28 — продолжить применение полного плана.');
+    return true;
+  }
+  if(command==='/applyresearch28'){
+ if(await store.isPaused())await send('Автонастройка на паузе.');
+ else try{await send(await applyResearch());}catch{await send('Применение не запущено: нужен завершённый свежий анализ 28 вариантов либо восстановление доступа. Слоты не менялись.');}
+ }else if(command==='/research28'||command==='/researchstatus'){
  try{await send(command==='/research28'?await research28():await researchStatus());}catch{await send('Подбор портфеля недоступен. Слоты не менялись.');}
  }else if(command==='/applyapproved'){
  if(await store.isPaused())await send('Автонастройка на паузе.');

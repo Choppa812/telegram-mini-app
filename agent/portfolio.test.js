@@ -9,6 +9,16 @@ test('base targets bind seven distinct existing slots to one exact Black model',
   assert.ok(BASE_PORTFOLIO.every(row=>row.backdrop==='Black'&&row.ceiling>0&&row.model));
 });
 
+test('owner-approved full replacement is bound to ID and the exact previous order',async()=>{
+ const f=fixture(),old=f.state[2];
+ Object.assign(old,{portalsAutobuy:true,portalsAutobuyQuantity:1,portalsAutobuyMaxPrice:12,modelNames:['Old model'],backdropNames:['White']});
+ const replaces=Object.fromEntries(['collectionName','modelNames','backdropNames','portalsAutobuy','portalsAutobuyQuantity','portalsAutobuyMaxPrice'].map(k=>[k,old[k]]));
+ f.portfolio=[{...TEST_PLAN[0],subscriptionId:old._id,replaces}];
+ await assert.rejects(applyPortfolioSlot(3,'test',{...f,beforeWrite:async()=>{}}),/SLOT_ALREADY_ACTIVE/);
+ const result=await applyPortfolioSlot(3,'test',{...f,allowApprovedReplacement:true,beforeWrite:async()=>{}});
+ assert.equal(result.changed,true);assert.equal(f.writes.length,1);
+});
+
 const reply=data=>({ok:true,status:200,json:async()=>data});
 const slot=(index,collection)=>({
   _id:index.toString(16).padStart(24,'0'),subscriptionName:collection,collectionName:collection,

@@ -23,6 +23,8 @@ export function runtime(env = process.env, fetcher = fetch) {
   const prefix = `satellite-control:${env.CONTROL_OWNER_ID}:`;
   const decode = value => typeof value === 'string' ? JSON.parse(value) : value;
   const store = {
+    getActiveResearchPlan: async () => decode(await redis('GET',prefix+'active-research-plan')),
+    saveActiveResearchPlan: row => redis('SET',prefix+'active-research-plan',JSON.stringify(row)),
     getResearchRun: async () => decode(await redis('GET',prefix+'research-run')),
     saveResearchRun: row => redis('SET',prefix+'research-run',JSON.stringify(row),'EX','604800'),
     acquireCatalogLease: async () => {const token=randomUUID();return await redis('SET',prefix+'catalog-lease',token,'NX','EX','330')?token:null;},
