@@ -21,7 +21,7 @@ export function researchCandidates(rows,balance,runId,slots){
   .sort((a,b)=>b.day.count-a.day.count||b.week.count-a.week.count||a.collection.localeCompare(b.collection)),seen=new Set(),result=[];
  const add=r=>{const id=identity(r);if(!seen.has(id)){seen.add(id);result.push(r);}};
  for(const s of slots.filter(s=>s.portalsAutobuy&&s.modelNames?.length===1&&s.backdropNames?.length===1&&s.backdropNames[0]==='Black'))
-  add({collection:s.collectionName,model:s.modelNames[0],backdrop:s.backdropNames[0]});
+  add({collection:s.collectionName,model:s.modelNames[0],backdrop:s.backdropNames[0],...(Number(s.portalsAutobuyMaxPrice)>0?{approvedCeiling:Number(s.portalsAutobuyMaxPrice)}:{})});
  const groups=new Map();
  for(const r of ranked){if(!groups.has(r.collection))groups.set(r.collection,[]);groups.get(r.collection).push(r);}
  // Round-robin prevents one newly popular collection from filling the portfolio.
@@ -110,7 +110,7 @@ export async function processResearchStep(message,{store,key,send,enqueue,varian
     const floors=(market.rows||[]).map(r=>r.floor).filter(f=>Number.isFinite(f)&&f>0);
     reason='EXACT_MARKET_UNAVAILABLE';
     if(market.ok&&market.rows.length===5&&floors.length){
-     const floor=Math.min(...floors),price=competitivePrice({ceiling:run.balance/1.03,day:history.day.q1,week:history.week.q1,floor});
+     const floor=Math.min(...floors),price=competitivePrice({ceiling:Math.min(run.balance/1.03,candidate.approvedCeiling??Infinity),day:history.day.q1,week:history.week.q1,floor});
      reason='NO_POSITIVE_MARGIN';
      if(price>0&&price*1.03<=run.balance)selected={collection,model,backdrop,ceiling:price,minWeek:8,pricing:'competitive',history,market,checkedAt:Date.now()};
     }

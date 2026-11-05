@@ -67,3 +67,9 @@ test('Black discovery finds missing models and queues exact verification without
  await processResearchStep({run:'r',index:0},{key:'test',send:async()=>{},enqueue:async()=>{},store:{acquireCatalogLease:async()=>'lease',releaseCatalogLease:async()=>{},getResearchRun:async()=>run,saveResearchRun:async()=>{}},variantReader:async()=>{calls++;},marketReader:async()=>{calls++;}});
  assert.equal(calls,0);assert.equal(run.selected.length,3);assert.equal(run.rejected[0].reason,'COLLECTION_LIMIT');
  });
+
+test('research of an already active exact model never raises its existing approved price',async()=>{
+ const run={id:'r',status:'running',index:0,balance:100,candidates:[{collection:'Gift',model:'Model',backdrop:'Black',approvedCeiling:10}],selected:[],rejected:[]};
+ await processResearchStep({run:'r',index:0},{key:'test',send:async()=>{},enqueue:async()=>{},store:{acquireCatalogLease:async()=>'lease',releaseCatalogLease:async()=>{},getResearchRun:async()=>run,saveResearchRun:async()=>{}},variantReader:async()=>({ok:true,complete:true,day:{count:4,q1:30},week:{count:12,q1:30}}),marketReader:async()=>({ok:true,rows:Array.from({length:5},()=>({floor:35}))})});
+ assert.equal(run.selected[0].ceiling,10);
+});
