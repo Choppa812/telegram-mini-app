@@ -53,3 +53,17 @@ test('Black discovery finds missing models and queues exact verification without
  });
 
 
+
+ test('diversification retains the three Chill models with the strongest daily and weekly turnover',async()=>{
+ const {diversifySelection}=await import('./portfolio-research.js');
+ const row=(model,day,week,collection='Chill Flame')=>({collection,model,backdrop:'Black',history:{day:{count:day},week:{count:week}}});
+ const result=diversifySelection([row('Tribal Totem',2,13),row('Bowl of Hygeia',5,8),row('Spaceship',5,14),row('Oracle',6,10),row('Other',9,12,'Other collection')]);
+ assert.deepEqual(result.filter(r=>r.collection==='Chill Flame').map(r=>r.model),['Bowl of Hygeia','Spaceship','Oracle']);
+ assert.equal(result.length,4);
+ });
+ test('collection cap blocks a fourth Chill model without querying markets or changing slots',async()=>{
+ const run={id:'r',status:'running',index:0,balance:100,collectionCaps:{'Chill Flame':3},candidates:[{collection:'Chill Flame',model:'Fourth',backdrop:'Black'}],selected:Array.from({length:3},(_,i)=>({collection:'Chill Flame',model:String(i),backdrop:'Black',ceiling:10,history:{day:{count:4},week:{count:12}}})),rejected:[]};
+ let calls=0;
+ await processResearchStep({run:'r',index:0},{key:'test',send:async()=>{},enqueue:async()=>{},store:{acquireCatalogLease:async()=>'lease',releaseCatalogLease:async()=>{},getResearchRun:async()=>run,saveResearchRun:async()=>{}},variantReader:async()=>{calls++;},marketReader:async()=>{calls++;}});
+ assert.equal(calls,0);assert.equal(run.selected.length,3);assert.equal(run.rejected[0].reason,'COLLECTION_LIMIT');
+ });

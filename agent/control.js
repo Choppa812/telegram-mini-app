@@ -31,10 +31,10 @@ export async function handleCommand(update, { ownerId, store, send, checkApi, ma
   const m = update?.message;
   if (!ownerId || m?.chat?.type !== 'private' || String(m?.from?.id) !== String(ownerId) || String(m?.chat?.id) !== String(ownerId)) return false;
   const command = (m.text || '').trim().split(/\s/)[0].split('@')[0].toLowerCase();
-  if (!['/start', '/help', '/status', '/report', '/pause', '/resume', '/checkapi', '/market', '/floors', '/highfloors', '/inspect', '/fees', '/rank', '/blackday', '/blackscan', '/blackscan90', '/positions', '/models', '/marketsales', '/cross', '/variants', '/variant', '/variantcross', '/applyblack', '/apply28', '/applyall', '/applycompetitive', '/applyprestige', '/blackclean', '/catalogscan', '/catalogall', '/catalogreport', '/catalogreview', '/applyapproved', '/research28', '/researchstatus'].includes(command)) return false;
+  if (!['/start', '/help', '/status', '/report', '/pause', '/resume', '/checkapi', '/market', '/floors', '/highfloors', '/inspect', '/fees', '/rank', '/blackday', '/blackscan', '/blackscan90', '/positions', '/models', '/marketsales', '/cross', '/variants', '/variant', '/variantcross', '/applyblack', '/apply28', '/applyall', '/applycompetitive', '/applyprestige', '/blackclean', '/catalogscan', '/catalogall', '/catalogreport', '/catalogreview', '/applyapproved', '/research28', '/researchstatus', '/researchdiverse'].includes(command)) return false;
   if (!Number.isSafeInteger(update.update_id)) return false;
-  if(command==='/research28'||command==='/researchstatus'){
- try{await send(command==='/research28'?await research28():await researchStatus());}catch{await send('Подбор портфеля недоступен. Слоты не менялись.');}
+  if(command==='/research28'||command==='/researchstatus'||command==='/researchdiverse'){
+ try{await send(command==='/researchstatus'?await researchStatus():await research28(command==='/researchdiverse'));}catch{await send('Подбор портфеля недоступен. Слоты не менялись.');}
  }else if(command==='/applyapproved'){
  if(await store.isPaused())await send('Автонастройка на паузе.');
  else try{const row=await applyApproved({beforeWrite:async()=>{if(await store.isPaused())throw new Error('AUTOMATION_PAUSED');}});await send('Trapped Heart / Heartworm / Desert Sand: '+(row.changed?'изменено':row.reason)+'; цена '+(row.price??'—')+' TON. Результат проверен API.');}catch(error){await send('Настройка не завершена: '+safeFailureCode(error));}
