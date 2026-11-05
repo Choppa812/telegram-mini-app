@@ -7,6 +7,13 @@ test('research preserves active exact targets and diversifies new collections',(
  const result=researchCandidates(rows,100,'run',[{portalsAutobuy:true,collectionName:'Existing',modelNames:['Kept'],backdropNames:['Black']}]);
  assert.equal(result[0].collection,'Existing');assert.notEqual(result[1].collection,result[2].collection);assert.equal(result.length,4);
 });
+test('Black-only research excludes liquid colored variants and active non-Black orders',()=>{
+ const combination=backdrop=>({model:'Model',backdrop,day:{count:99,q1:20},week:{count:100}});
+ const result=researchCandidates([{runId:'run',collection:'Gift',combinations:[combination('Black'),combination('Desert Sand')]}],100,'run',[
+  {portalsAutobuy:true,collectionName:'Trapped Heart',modelNames:['Heartworm'],backdropNames:['Desert Sand']},
+ ]);
+ assert.equal(result.length,1);assert.equal(result[0].backdrop,'Black');
+});
 test('research checkpoints and resumes without repeating a completed candidate',async()=>{
  const run={id:'r',status:'running',index:0,balance:100,candidates:[{collection:'Gift',model:'Model',backdrop:'Black'},{collection:'Next'}],selected:[],rejected:[]};
  let reads=0,queued=0;
