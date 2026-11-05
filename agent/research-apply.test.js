@@ -26,3 +26,9 @@ test('colored slot 7 is assigned a Black replacement before other unused slots',
  assert.equal(rows.find(r=>r.slot===7).backdrop,'Black');
 });
 
+
+test('activation refuses the superseded plan with more than three Chill Flame slots',()=>{
+ const selected=Array.from({length:28},(_,i)=>({collection:i<4?'Chill Flame':'Gift '+i,model:'Model '+i,backdrop:'Black',ceiling:10}));
+ const slots=Array.from({length:28},(_,i)=>({_id:String(i)}));
+ assert.throws(()=>assignResearchSlots(selected,slots),/COLLECTION_LIMIT/);
+});
