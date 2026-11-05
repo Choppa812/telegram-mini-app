@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto';
-import { rankCatalog } from './catalog-review.js';
 import { readVariant } from './variants.js';
 import { readCrossMarket } from './cross.js';
 import { readSatellite } from './satellite.js';
@@ -7,7 +6,12 @@ import { competitivePrice } from './competitive.js';
 
 const identity=r=>JSON.stringify([r.collection,r.model,r.backdrop]);
 export function researchCandidates(rows,balance,runId,slots){
- const ranked=rankCatalog(rows,balance,runId).filter(r=>r.backdrop==='Black'),seen=new Set(),result=[];
+ // Discovery may use a partial observation. Every proposed bid still needs
+ // complete exact-model history with multiple daily and weekly sales below.
+ const ranked=rows.filter(r=>r?.runId===runId).flatMap(r=>(r.combinations||[])
+  .filter(c=>c.backdrop==='Black'&&c.day?.count>=1&&c.week?.count>=3&&c.day.q1>0&&c.day.q1<=balance)
+  .map(c=>({...c,collection:r.collection})))
+  .sort((a,b)=>b.day.count-a.day.count||b.week.count-a.week.count||a.collection.localeCompare(b.collection)),seen=new Set(),result=[];
  const add=r=>{const id=identity(r);if(!seen.has(id)){seen.add(id);result.push(r);}};
  for(const s of slots.filter(s=>s.portalsAutobuy&&s.modelNames?.length===1&&s.backdropNames?.length===1&&s.backdropNames[0]==='Black'))
   add({collection:s.collectionName,model:s.modelNames[0],backdrop:s.backdropNames[0]});
@@ -53,7 +57,7 @@ export async function processResearchStep(message,{store,key,send,enqueue,varian
    try{history=await variantReader(collection,model,backdrop,key,{maxPages:100});}
    catch(error){if(error.message==='INVALID_VARIANT_REQUEST')history={ok:false,complete:false};else throw error;}
    let reason='INSUFFICIENT_EXACT_SALES',selected;
-   if(history.ok&&history.complete&&history.day.count>=3&&history.week.count>=8&&history.day.q1>0&&history.week.q1>0){
+   if(history.ok&&history.complete&&history.day.count>=2&&history.week.count>=8&&history.day.q1>0&&history.week.q1>0){
     const market=await marketReader(collection,key,undefined,undefined,backdrop,model);
     const floors=(market.rows||[]).map(r=>r.floor).filter(f=>Number.isFinite(f)&&f>0);
     reason='EXACT_MARKET_UNAVAILABLE';
@@ -82,7 +86,7 @@ export function researchText(run){
  const lines=[`Подбор 28 слотов только Black: ${run.status}; проверено ${run.index}/${run.candidates.length}; подтверждено ${run.selected.length}/28.`,
   ...(run.status==='running'?[`Следующий: ${run.candidates[run.index]?.collection} / ${run.candidates[run.index]?.model} / ${run.candidates[run.index]?.backdrop}.`]:[]),
   ...run.selected.map((r,i)=>`${i+1}. ${r.collection} / ${r.model} / ${r.backdrop}: до ${r.ceiling.toFixed(2)} TON; ${r.history.day.count}/${r.history.week.count} продаж.`),
-  'Покупка: 3%; продажа: резерв 2%; расчётный запас 1,5 TON. Это анализ; слоты не изменялись.'];
+  'Требуется полная точная история: минимум 2 продажи за сутки и 8 за неделю. Покупка: 3%; продажа: резерв 2%; расчётный запас 1,5 TON. Это анализ; слоты не изменялись.'];
  return lines.join('\n');
 }
 
