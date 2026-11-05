@@ -9,7 +9,7 @@ const summary=rows=>{
 
 // Read-only inventory and sales discovery. A scan is not a trading plan.
 export async function scanCatalog(key,{fetcher=fetch,pause=ms=>new Promise(r=>setTimeout(r,ms)),
-  now=Date.now(),maxPages=10000,onCollection=async()=>{},offset=0,limit=Infinity}={}) {
+  now=Date.now(),maxPages=10000,onCollection=async()=>{},offset=0,limit=Infinity,backdrop}={}) {
   if(!key)throw new Error('API_KEY_MISSING');
   const request=async(path,body)=>{
     await pause(1500);
@@ -33,7 +33,7 @@ export async function scanCatalog(key,{fetcher=fetch,pause=ms=>new Promise(r=>se
       row.backdrops=detail.backdrops.map(b=>b.name);
       const sales=[],seen=new Set();let oldest=Infinity;
       for(let page=0;page<maxPages;page++){
-        const data=await request('/history/'+encodeURIComponent(collection.name),{page,pageSize:20,sortBy:'date'});
+        const data=await request('/history/'+encodeURIComponent(collection.name),{page,pageSize:20,sortBy:'date',...(backdrop?{backdrops:[backdrop]}:{})});
         if(!Array.isArray(data?.content))throw new Error('INVALID_HISTORY');
         const times=data.content.map(s=>Date.parse(s.soldAt));
         if(times.some(t=>!Number.isFinite(t))||times.some((t,i)=>i&&t>times[i-1])||
@@ -43,7 +43,7 @@ export async function scanCatalog(key,{fetcher=fetch,pause=ms=>new Promise(r=>se
           const sale=data.content[i],id=sale._id;
           if(typeof id!=='string')throw new Error('MISSING_SALE_ID');
           if(seen.has(id))continue;seen.add(id);
-          if(times[i]<=now&&times[i]>=now-7*86400000&&Number(sale.normalizedPrice)>0)sales.push(sale);
+          if(times[i]<=now&&times[i]>=now-7*86400000&&Number(sale.normalizedPrice)>0&&(!backdrop||sale.backdropName===backdrop))sales.push(sale);
         }
         oldest=times.at(-1)??oldest;
         if(data.content.length<20||oldest<now-7*86400000){row.complete=true;break;}

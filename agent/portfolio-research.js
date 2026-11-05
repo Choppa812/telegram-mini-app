@@ -3,6 +3,7 @@ import { readVariant } from './variants.js';
 import { readCrossMarket } from './cross.js';
 import { readSatellite } from './satellite.js';
 import { competitivePrice } from './competitive.js';
+import { scanCatalog } from './catalog-scan.js';
 
 const identity=r=>JSON.stringify([r.collection,r.model,r.backdrop]);
 export function researchCandidates(rows,balance,runId,slots){
@@ -26,9 +27,12 @@ export async function startResearch({store,key,enqueue}){
  const lease=await store.acquireCatalogLease();if(!lease)throw Error('RESEARCH_BUSY');
  try{
   let previous=await store.getResearchRun();
-  if(previous?.status==='running'&&previous.scope==='Black'){
+  if(previous?.status==='insufficient'&&previous.scope==='Black'&&previous.discoveryIndex===undefined){
+   previous.status='discovering';previous.discoveryIndex=0;await store.saveResearchRun(previous);
+  }
+  if(['running','discovering'].includes(previous?.status)&&previous.scope==='Black'){
    await store.releaseCatalogLease(lease);
-   await enqueue('catalog-scan',{kind:'research',run:previous.id,index:previous.index},{idempotencyKey:previous.id+':resume:'+previous.index+':'+Math.floor(Date.now()/60000),retentionSeconds:604800});
+   await enqueue('catalog-scan',{kind:'research',run:previous.id,index:previous.index,...(previous.status==='discovering'?{discoveryIndex:previous.discoveryIndex}:{})},{idempotencyKey:previous.id+':resume:'+previous.index+':'+(previous.discoveryIndex??0)+':'+Math.floor(Date.now()/60000),retentionSeconds:604800});
    return researchText(previous);
   }
   const catalog=await store.getCatalogRun();if(!catalog?.total)throw Error('NO_CATALOG');
@@ -38,16 +42,35 @@ export async function startResearch({store,key,enqueue}){
   const rows=await store.getCatalogRows(catalog.total);
   const run={id:randomUUID(),scope:'Black',status:'running',startedAt:Date.now(),index:0,balance,slots:subs.data,
    candidates:researchCandidates(rows,balance,catalog.id,subs.data),selected:[],rejected:[]};
+  if(!run.candidates.length){run.status='discovering';run.discoveryIndex=0;}
   await store.saveResearchRun(run);
   await store.releaseCatalogLease(lease);
-  await enqueue('catalog-scan',{kind:'research',run:run.id,index:0},{idempotencyKey:run.id+':0',retentionSeconds:604800});
+  await enqueue('catalog-scan',{kind:'research',run:run.id,index:0,...(run.status==='discovering'?{discoveryIndex:0}:{})},{idempotencyKey:run.id+':0',retentionSeconds:604800});
   return researchText(run);
  }finally{await store.releaseCatalogLease(lease);}
 }
-export async function processResearchStep(message,{store,key,send,enqueue,variantReader=readVariant,marketReader=readCrossMarket}){
+export async function processResearchStep(message,{store,key,send,enqueue,variantReader=readVariant,marketReader=readCrossMarket,scan=scanCatalog}){
  const lease=await store.acquireCatalogLease();if(!lease)throw Error('RESEARCH_BUSY');
  try{
-  const run=await store.getResearchRun();if(!run||run.id!==message.run||run.status!=='running')return;
+  const run=await store.getResearchRun();if(!run||run.id!==message.run||!['running','discovering'].includes(run.status))return;
+  if(run.status==='discovering'){
+   if(message.discoveryIndex===run.discoveryIndex){
+    const result=await scan(key,{offset:run.discoveryIndex,limit:1,maxPages:60,backdrop:'Black'});
+    const seen=new Set(run.candidates.map(identity));
+    for(const row of result.collections)for(const c of row.combinations||[]){
+     const candidate={...c,collection:row.collection};
+     if(c.backdrop==='Black'&&c.day.count>=1&&c.week.count>=3&&c.day.q1>0&&c.day.q1<=run.balance&&!seen.has(identity(candidate))){run.candidates.push(candidate);seen.add(identity(candidate));}
+    }
+    run.discoveryIndex++;run.discoveryTotal=result.catalogTotal;
+    run.status=run.index<run.candidates.length?'running':run.discoveryIndex<result.catalogTotal?'discovering':'insufficient';
+    await store.saveResearchRun(run);
+    if(run.status==='insufficient'||run.discoveryIndex%10===0)try{await send(researchText(run));}catch{}
+   }
+   await store.releaseCatalogLease(lease);
+   if(run.status==='discovering')await enqueue('catalog-scan',{kind:'research',run:run.id,index:run.index,discoveryIndex:run.discoveryIndex},{idempotencyKey:run.id+':discover:'+run.discoveryIndex,retentionSeconds:604800});
+   else if(run.status==='running')await enqueue('catalog-scan',{kind:'research',run:run.id,index:run.index},{idempotencyKey:run.id+':'+run.index,retentionSeconds:604800});
+   return;
+  }
   if(run.index===message.index){
    const candidate=run.candidates[run.index];
    if(!candidate)throw Error('EMPTY_RESEARCH');
@@ -69,11 +92,15 @@ export async function processResearchStep(message,{store,key,send,enqueue,varian
    }
    if(selected)run.selected.push(selected);else run.rejected.push({collection,model,backdrop,reason});
    run.index++;
-   run.status=run.selected.length===28?'completed':run.index===run.candidates.length?'insufficient':'running';
+   run.status=run.selected.length===28?'completed':run.index===run.candidates.length?(run.discoveryIndex===undefined||run.discoveryIndex<run.discoveryTotal?'discovering':'insufficient'):'running';
+   if(run.status==='discovering'&&run.discoveryIndex===undefined)run.discoveryIndex=0;
    await store.saveResearchRun(run);
    if(run.status!=='running'||run.index%10===0)try{await send(researchText(run));}catch{}
   }
-  if(run.status==='running'){
+  if(run.status==='discovering'){
+   await store.releaseCatalogLease(lease);
+   await enqueue('catalog-scan',{kind:'research',run:run.id,index:run.index,discoveryIndex:run.discoveryIndex},{idempotencyKey:run.id+':discover:'+run.discoveryIndex,retentionSeconds:604800});
+  }else if(run.status==='running'){
    // Release before publishing: fast delivery can otherwise collide with our
    // own lease and impose a full queue retry interval on the following step.
    await store.releaseCatalogLease(lease);
@@ -84,6 +111,7 @@ export async function processResearchStep(message,{store,key,send,enqueue,varian
 export function researchText(run){
  if(!run)return 'Подбор портфеля ещё не запущен.';
  const lines=[`Подбор 28 слотов только Black: ${run.status}; проверено ${run.index}/${run.candidates.length}; подтверждено ${run.selected.length}/28.`,
+  ...(run.discoveryIndex!==undefined?[`Дополнительный сбор Black: ${run.discoveryIndex}/${run.discoveryTotal??132} коллекций.`]:[]),
   ...(run.status==='running'?[`Следующий: ${run.candidates[run.index]?.collection} / ${run.candidates[run.index]?.model} / ${run.candidates[run.index]?.backdrop}.`]:[]),
   ...run.selected.map((r,i)=>`${i+1}. ${r.collection} / ${r.model} / ${r.backdrop}: до ${r.ceiling.toFixed(2)} TON; ${r.history.day.count}/${r.history.week.count} продаж.`),
   'Требуется полная точная история: минимум 2 продажи за сутки и 8 за неделю. Покупка: 3%; продажа: резерв 2%; расчётный запас 1,5 TON. Это анализ; слоты не изменялись.'];

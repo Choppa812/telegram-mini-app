@@ -28,7 +28,17 @@ test('research checkpoints and resumes without repeating a completed candidate',
 test('incomplete exact history never produces a proposed purchase',async()=>{
  const run={id:'r',status:'running',index:0,balance:100,candidates:[{collection:'Gift',model:'Model',backdrop:'Black'}],selected:[],rejected:[]};
  await processResearchStep({run:'r',index:0},{key:'test',send:async()=>{},enqueue:async()=>{},store:{acquireCatalogLease:async()=>'lease',releaseCatalogLease:async()=>{},getResearchRun:async()=>run,saveResearchRun:async()=>{}},variantReader:async()=>({ok:true,complete:false}),marketReader:async()=>{throw Error('must not query');}});
- assert.equal(run.status,'insufficient');assert.equal(run.selected.length,0);
+ assert.equal(run.status,'discovering');assert.equal(run.selected.length,0);
+});
+test('Black discovery finds missing models and queues exact verification without selecting partial data',async()=>{
+ const run={id:'r',scope:'Black',status:'discovering',index:0,discoveryIndex:0,balance:100,candidates:[],selected:[],rejected:[]};
+ const queued=[];
+ await processResearchStep({run:'r',index:0,discoveryIndex:0},{key:'test',send:async()=>{},enqueue:async(topic,message)=>queued.push(message),store:{acquireCatalogLease:async()=>'lease',releaseCatalogLease:async()=>{},getResearchRun:async()=>run,saveResearchRun:async()=>{}},scan:async(key,options)=>{
+ assert.equal(options.backdrop,'Black');
+ return {catalogTotal:132,complete:false,collections:[{collection:'Hidden',combinations:[{model:'Model',backdrop:'Black',day:{count:2,q1:20},week:{count:9}},{model:'Other',backdrop:'White',day:{count:9,q1:20},week:{count:20}}]}]};
+ }});
+ assert.equal(run.candidates.length,1);assert.equal(run.selected.length,0);
+ assert.equal(run.status,'running');assert.equal(queued[0].index,0);assert.equal(queued[0].discoveryIndex,undefined);
 });
 
 
@@ -41,4 +51,5 @@ test('incomplete exact history never produces a proposed purchase',async()=>{
  assert.equal(result.complete,true);assert.equal(calls,1);
  await assert.rejects(readVariant('Gift','bad\nmodel','Black','test'),/INVALID_VARIANT_REQUEST/);
  });
+
 
