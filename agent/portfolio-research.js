@@ -7,9 +7,9 @@ import { competitivePrice } from './competitive.js';
 
 const identity=r=>JSON.stringify([r.collection,r.model,r.backdrop]);
 export function researchCandidates(rows,balance,runId,slots){
- const ranked=rankCatalog(rows,balance,runId),seen=new Set(),result=[];
+ const ranked=rankCatalog(rows,balance,runId).filter(r=>r.backdrop==='Black'),seen=new Set(),result=[];
  const add=r=>{const id=identity(r);if(!seen.has(id)){seen.add(id);result.push(r);}};
- for(const s of slots.filter(s=>s.portalsAutobuy&&s.modelNames?.length===1&&s.backdropNames?.length===1))
+ for(const s of slots.filter(s=>s.portalsAutobuy&&s.modelNames?.length===1&&s.backdropNames?.length===1&&s.backdropNames[0]==='Black'))
   add({collection:s.collectionName,model:s.modelNames[0],backdrop:s.backdropNames[0]});
  const groups=new Map();
  for(const r of ranked){if(!groups.has(r.collection))groups.set(r.collection,[]);groups.get(r.collection).push(r);}
@@ -22,7 +22,7 @@ export async function startResearch({store,key,enqueue}){
  const lease=await store.acquireCatalogLease();if(!lease)throw Error('RESEARCH_BUSY');
  try{
   let previous=await store.getResearchRun();
-  if(previous?.status==='running'){
+  if(previous?.status==='running'&&previous.scope==='Black'){
    await store.releaseCatalogLease(lease);
    await enqueue('catalog-scan',{kind:'research',run:previous.id,index:previous.index},{idempotencyKey:previous.id+':resume:'+previous.index+':'+Math.floor(Date.now()/60000),retentionSeconds:604800});
    return researchText(previous);
@@ -32,7 +32,7 @@ export async function startResearch({store,key,enqueue}){
   if(!profile.ok||!subs.ok||!Array.isArray(subs.data)||subs.data.length!==28)throw Error('ACCOUNT_READ_FAILED');
   const balance=Number(profile.data.tonBalance);if(!Number.isFinite(balance)||balance<=0)throw Error('INVALID_BALANCE');
   const rows=await store.getCatalogRows(catalog.total);
-  const run={id:randomUUID(),status:'running',startedAt:Date.now(),index:0,balance,slots:subs.data,
+  const run={id:randomUUID(),scope:'Black',status:'running',startedAt:Date.now(),index:0,balance,slots:subs.data,
    candidates:researchCandidates(rows,balance,catalog.id,subs.data),selected:[],rejected:[]};
   await store.saveResearchRun(run);
   await store.releaseCatalogLease(lease);
@@ -48,6 +48,7 @@ export async function processResearchStep(message,{store,key,send,enqueue,varian
    const candidate=run.candidates[run.index];
    if(!candidate)throw Error('EMPTY_RESEARCH');
    const {collection,model,backdrop}=candidate;
+   if(backdrop!=='Black')throw Error('BLACK_ONLY_RESEARCH');
    let history;
    try{history=await variantReader(collection,model,backdrop,key,{maxPages:100});}
    catch(error){if(error.message==='INVALID_VARIANT_REQUEST')history={ok:false,complete:false};else throw error;}
@@ -78,7 +79,7 @@ export async function processResearchStep(message,{store,key,send,enqueue,varian
 }
 export function researchText(run){
  if(!run)return 'Подбор портфеля ещё не запущен.';
- const lines=[`Подбор 28 слотов: ${run.status}; проверено ${run.index}/${run.candidates.length}; подтверждено ${run.selected.length}/28.`,
+ const lines=[`Подбор 28 слотов только Black: ${run.status}; проверено ${run.index}/${run.candidates.length}; подтверждено ${run.selected.length}/28.`,
   ...(run.status==='running'?[`Следующий: ${run.candidates[run.index]?.collection} / ${run.candidates[run.index]?.model} / ${run.candidates[run.index]?.backdrop}.`]:[]),
   ...run.selected.map((r,i)=>`${i+1}. ${r.collection} / ${r.model} / ${r.backdrop}: до ${r.ceiling.toFixed(2)} TON; ${r.history.day.count}/${r.history.week.count} продаж.`),
   'Покупка: 3%; продажа: резерв 2%; расчётный запас 1,5 TON. Это анализ; слоты не изменялись.'];
