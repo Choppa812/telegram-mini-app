@@ -43,7 +43,7 @@ export async function handleCommand(update, { ownerId, store, send, checkApi, ma
  if(await store.isPaused())await send('Автонастройка на паузе.');
  else try{await send(await applyResearch());}catch{await send('Применение не запущено: нужен завершённый свежий анализ 28 вариантов либо восстановление доступа. Слоты не менялись.');}
  }else if(command==='/research28'||command==='/researchstatus'||command==='/researchdiverse'||command==='/researchaudit'||command==='/researchfill'||command==='/researchall'){
- try{await send(command==='/researchstatus'?await researchStatus():await research28(command==='/researchdiverse',command==='/researchaudit',command==='/researchfill',command==='/researchall'));}catch{await send('Подбор портфеля недоступен. Слоты не менялись.');}
+ try{await send(command==='/researchstatus'?await researchStatus():await research28(command==='/researchdiverse',command==='/researchaudit',command==='/researchfill',command==='/researchall'));}catch(error){const code=/^(ACCOUNT_READ_FAILED|INVALID_BALANCE|RESEARCH_BUSY|STORE_UNAVAILABLE|STORE_COMMAND_FAILED|SATELLITE_CONFIGURATION_MISSING)$/.test(error.message)?error.message:'RESEARCH_UNAVAILABLE';await send('Подбор портфеля недоступен: '+code+'. Слоты не менялись.');}
  }else if(command==='/applyapproved'){
  if(await store.isPaused())await send('Автонастройка на паузе.');
  else try{const row=await applyApproved({beforeWrite:async()=>{if(await store.isPaused())throw new Error('AUTOMATION_PAUSED');}});await send('Trapped Heart / Heartworm / Desert Sand: '+(row.changed?'изменено':row.reason)+'; цена '+(row.price??'—')+' TON. Результат проверен API.');}catch(error){await send('Настройка не завершена: '+safeFailureCode(error));}
