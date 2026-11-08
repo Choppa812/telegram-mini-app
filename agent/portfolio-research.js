@@ -234,4 +234,15 @@ export function researchText(run){
  return lines.join('\n');
 }
 
+export function researchDetails(run,page){
+ if(!run||!Number.isInteger(page)||page<0||page>3)return 'Укажите страницу /researchdetails 0–3.';
+ const fixed=n=>Number.isFinite(n)?n.toFixed(2):'нет';
+ return [`Детали нового подбора; ${run.status}; страница ${page+1}/4.`,
+  ...run.selected.slice(page*7,page*7+7).map((r,i)=>{
+   const floors=r.market.rows.map(m=>m.floor).filter(f=>Number.isFinite(f)&&f>0);
+   const exit=Math.min(r.history.day.q1,r.history.week.q1,...floors);
+   return `${page*7+i+1}. ${r.collection} / ${r.model} / ${r.backdrop}: лимит ${fixed(r.ceiling)} TON.\nПродажи 24ч/7д: ${r.history.day.count}/${r.history.week.count}; Q1 ${fixed(r.history.day.q1)}/${fixed(r.history.week.q1)}; медиана ${fixed(r.history.day.median)}/${fixed(r.history.week.median)}.\nФлоры: ${r.market.rows.map(m=>m.market+' '+fixed(m.floor)).join('; ')}.\nРасчётный выход ${fixed(exit)}, остаток после 3% покупки и 2% продажи ${fixed(exit*.98-r.ceiling*1.03)} TON до переводов. Проверено ${new Date(r.checkedAt).toISOString()}.`;
+  }), 'Только анализ. Цена выхода и срок продажи не гарантированы. Слоты не менялись.'].join('\n');
+}
+
 
