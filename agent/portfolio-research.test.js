@@ -1,6 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {researchCandidates,processResearchStep} from './portfolio-research.js';
+test('retrying a failed collection preserves coverage and verifies only newly discovered candidates',async()=>{
+ const run={id:'retry',fullCatalog:true,status:'discovering',index:1,discoveryIndex:1,retryIndices:[1],retryCursor:0,balance:100,candidates:[{collection:'Kept',model:'A',backdrop:'Black'}],selected:[],qualified:[],rejected:[],coverage:[{collection:'Kept',complete:true},{collection:'Retry',complete:false}]};
+ const queued=[];
+ await processResearchStep({run:'retry',index:1,discoveryIndex:1},{key:'test',send:async()=>{},enqueue:async(t,m)=>queued.push(m),store:{acquireCatalogLease:async()=>'lease',releaseCatalogLease:async()=>{},getResearchRun:async()=>run,saveResearchRun:async()=>{}},scan:async(k,o)=>{assert.equal(o.offset,1);return {catalogTotal:2,collections:[{collection:'Retry',complete:true,combinations:[{model:'New',backdrop:'Black',day:{count:3,q1:20},week:{count:12}}]}]};}});
+ assert.equal(run.coverage.length,2);assert.equal(run.coverage[1].complete,true);assert.equal(run.status,'running');assert.equal(run.index,1);assert.equal(queued[0].index,1);
+});
 test('full catalog research visits every collection before exact verification',async()=>{
  const run={id:'all',fullCatalog:true,status:'discovering',index:0,discoveryIndex:0,balance:100,candidates:[],selected:[],qualified:[],rejected:[],coverage:[]};
  const queued=[];
