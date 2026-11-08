@@ -1,6 +1,24 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {researchCandidates,processResearchStep} from './portfolio-research.js';
+test('full catalog research visits every collection before exact verification',async()=>{
+ const run={id:'all',fullCatalog:true,status:'discovering',index:0,discoveryIndex:0,balance:100,candidates:[],selected:[],qualified:[],rejected:[],coverage:[]};
+ const queued=[];
+ const deps={key:'test',send:async()=>{},enqueue:async(t,m)=>queued.push(m),store:{acquireCatalogLease:async()=>'lease',releaseCatalogLease:async()=>{},getResearchRun:async()=>run,saveResearchRun:async()=>{}},scan:async()=>({catalogTotal:2,startedAt:'2026-11-08T12:00:00Z',collections:[{collection:'Gift',complete:false,error:'PAGE_LIMIT_REACHED',combinations:[{model:'Model',backdrop:'Black',day:{count:2,q1:20},week:{count:10}}]}]})};
+ await processResearchStep({run:'all',index:0,discoveryIndex:0},deps);
+ assert.equal(run.status,'discovering');assert.equal(run.selected.length,0);assert.equal(queued[0].discoveryIndex,1);
+ await processResearchStep({run:'all',index:0,discoveryIndex:1},deps);
+ assert.equal(run.status,'running');assert.equal(run.coverage.length,2);assert.equal(run.coverage[0].complete,false);
+});
+test('full research continues past 28 qualifying models and compares the last candidate',async()=>{
+ const row=i=>({collection:'Gift',model:'M'+i,backdrop:'Black',history:{day:{count:2,q1:20},week:{count:8,q1:20}},ceiling:10});
+ const run={id:'all',fullCatalog:true,status:'running',index:0,balance:100,candidates:[{collection:'New',model:'Liquid',backdrop:'Black'},{collection:'Last',model:'Last',backdrop:'Black'}],selected:Array.from({length:28},(_,i)=>row(i)),qualified:Array.from({length:28},(_,i)=>row(i)),rejected:[]};
+ const deps={key:'test',send:async()=>{},enqueue:async()=>{},store:{acquireCatalogLease:async()=>'lease',releaseCatalogLease:async()=>{},getResearchRun:async()=>run,saveResearchRun:async()=>{}},variantReader:async()=>({ok:true,complete:true,day:{count:10,q1:20},week:{count:70,q1:20}}),marketReader:async()=>({ok:true,rows:Array.from({length:5},()=>({floor:22}))})};
+ await processResearchStep({run:'all',index:0},deps);
+ assert.equal(run.status,'running');assert.equal(run.selected[0].collection,'New');
+ await processResearchStep({run:'all',index:1},deps);
+ assert.equal(run.status,'completed');assert.equal(run.selected.length,28);assert.equal(run.qualified.length,30);assert.ok(run.selected.some(r=>r.collection==='Last'));
+});
 test('research preserves active exact targets and diversifies new collections',()=>{
  const combo=model=>({model,backdrop:'Black',day:{count:9,q1:20},week:{count:12}});
  const rows=[{runId:'run',collection:'Popular',combinations:[combo('One'),combo('Two')]},{runId:'run',collection:'Other',combinations:[combo('Three')]}];

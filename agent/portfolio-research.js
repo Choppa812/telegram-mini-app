@@ -34,7 +34,12 @@ export function researchCandidates(rows,balance,runId,slots){
   for(const group of groups.values())if(group.length&&result.length<160)add(group.shift());
  return result;
 }
-export async function startResearch({store,key,enqueue,diversify=false,audit=false,fill=false,wait=ms=>new Promise(resolve=>setTimeout(resolve,ms))}){
+export function rankResearch(rows){
+ return diversifySelection([...rows].sort((a,b)=>
+  Math.min(b.history.day.count,b.history.week.count/7)-Math.min(a.history.day.count,a.history.week.count/7)||
+  b.history.week.count-a.history.week.count||a.collection.localeCompare(b.collection))).slice(0,28);
+}
+export async function startResearch({store,key,enqueue,diversify=false,audit=false,fill=false,all=false,wait=ms=>new Promise(resolve=>setTimeout(resolve,ms))}){
  // Queue sends are pinned to the sending deployment. A correction must acquire
  // the shared checkpoint between steps and resume from the current deployment,
  // rather than letting an old running worker overwrite the revised proposal.
@@ -45,6 +50,20 @@ export async function startResearch({store,key,enqueue,diversify=false,audit=fal
  if(!lease)throw Error('RESEARCH_BUSY');
  try{
   let previous=await store.getResearchRun();
+  if(all){
+   if(previous?.fullCatalog&&['running','discovering'].includes(previous.status)){
+    await store.releaseCatalogLease(lease);
+    await enqueue('catalog-scan',{kind:'research',run:previous.id,index:previous.index,...(previous.status==='discovering'?{discoveryIndex:previous.discoveryIndex}:{})},{idempotencyKey:previous.id+':all-resume:'+previous.index+':'+previous.discoveryIndex+':'+Math.floor(Date.now()/60000),retentionSeconds:604800});
+    return researchText(previous);
+   }
+   const [profile,subs]=await Promise.all([readSatellite('/user/me',{},key,'token'),readSatellite('/user/subscriptions',{},key,'token')]);
+   if(!profile.ok||!subs.ok||!Array.isArray(subs.data)||subs.data.length!==28)throw Error('ACCOUNT_READ_FAILED');
+   const balance=Number(profile.data.tonBalance);if(!Number.isFinite(balance)||balance<=0)throw Error('INVALID_BALANCE');
+   const run={id:randomUUID(),scope:'Black',fullCatalog:true,status:'discovering',startedAt:Date.now(),index:0,balance,slots:subs.data,candidates:[],selected:[],qualified:[],rejected:[],coverage:[],collectionCaps:{'Chill Flame':3},discoveryIndex:0};
+   await store.saveResearchRun(run);await store.releaseCatalogLease(lease);
+   await enqueue('catalog-scan',{kind:'research',run:run.id,index:0,discoveryIndex:0},{idempotencyKey:run.id+':all:0',retentionSeconds:604800});
+   return researchText(run);
+  }
   if(fill){
    if(previous?.preserveExisting&&['running','discovering'].includes(previous.status)){
     await store.releaseCatalogLease(lease);
@@ -140,7 +159,10 @@ export async function processResearchStep(message,{store,key,send,enqueue,varian
      if(c.backdrop==='Black'&&c.day.count>=1&&c.week.count>=3&&c.day.q1>0&&c.day.q1<=run.balance&&!seen.has(identity(candidate))){run.candidates.push(candidate);seen.add(identity(candidate));}
     }
     run.discoveryIndex++;run.discoveryTotal=result.catalogTotal;
-    run.status=run.index<run.candidates.length?'running':run.discoveryIndex<result.catalogTotal?'discovering':'insufficient';
+    if(run.fullCatalog){
+     run.coverage.push(...result.collections.map(r=>({collection:r.collection,complete:r.complete,error:r.error,observedSales:r.observedSales,date:result.startedAt})));
+     run.status=run.discoveryIndex<result.catalogTotal?'discovering':run.candidates.length?'running':'insufficient';
+    }else run.status=run.index<run.candidates.length?'running':run.discoveryIndex<result.catalogTotal?'discovering':'insufficient';
     await store.saveResearchRun(run);
     if(run.status==='insufficient'||run.discoveryIndex%10===0)try{await send(researchText(run));}catch{}
    }
@@ -156,7 +178,7 @@ export async function processResearchStep(message,{store,key,send,enqueue,varian
    if(backdrop!=='Black')throw Error('BLACK_ONLY_RESEARCH');
    const cap=run.collectionCaps?.[collection];
    let reason='INSUFFICIENT_EXACT_SALES',selected;
-   if(cap!==undefined&&run.selected.filter(r=>r.collection===collection).length>=cap){
+   if(!run.fullCatalog&&cap!==undefined&&run.selected.filter(r=>r.collection===collection).length>=cap){
     reason='COLLECTION_LIMIT';
    }else{
    let history;
@@ -174,9 +196,14 @@ export async function processResearchStep(message,{store,key,send,enqueue,varian
     }
    }
    }
-   if(selected)run.selected.push(selected);else run.rejected.push({collection,model,backdrop,reason});
+   if(selected){
+    if(run.fullCatalog){run.qualified.push(selected);run.selected=rankResearch(run.qualified);}
+    else run.selected.push(selected);
+   }else run.rejected.push({collection,model,backdrop,reason});
    run.index++;
-   run.status=run.selected.length===28?'completed':run.index===run.candidates.length?(run.discoveryIndex===undefined||run.discoveryIndex<run.discoveryTotal?'discovering':'insufficient'):'running';
+   run.status=run.fullCatalog?(run.index<run.candidates.length?'running':run.selected.length===28?'completed':'insufficient'):
+    run.selected.length===28?'completed':run.index===run.candidates.length?(run.discoveryIndex===undefined||run.discoveryIndex<run.discoveryTotal?'discovering':'insufficient'):'running';
+   if(['completed','insufficient'].includes(run.status))run.finishedAt=Date.now();
    if(run.status==='discovering'&&run.discoveryIndex===undefined)run.discoveryIndex=0;
    await store.saveResearchRun(run);
    if(run.status!=='running'||run.index%10===0)try{await send(researchText(run));}catch{}
@@ -195,6 +222,9 @@ export async function processResearchStep(message,{store,key,send,enqueue,varian
 export function researchText(run){
  if(!run)return 'Подбор портфеля ещё не запущен.';
  const lines=[`Подбор 28 слотов только Black: ${run.status}; проверено ${run.index}/${run.candidates.length}; подтверждено ${run.selected.length}/28.`,
+  ...(run.fullCatalog?[`Новый обход всех коллекций: ${run.discoveryIndex}/${run.discoveryTotal??'?'}; полная история у ${run.coverage.filter(r=>r.complete).length}, неполная у ${run.coverage.filter(r=>!r.complete).length}.`,
+   `Данные с ${new Date(run.startedAt).toISOString()}${run.finishedAt?' по '+new Date(run.finishedAt).toISOString():''}; баланс при запуске ${run.balance.toFixed(2)} TON.`,
+   'Сравниваются все найденные кандидаты; список предварительный до завершения. Приоритет — устойчивый оборот точного сочетания.']:[]),
   ...(run.preserveExisting?[`Действующих ставок сохраняется: ${run.selected.filter(r=>r.retained).length}; изменения только для свободных мест.`]:[]),
   ...(run.collectionCaps?.['Chill Flame']===3?['Chill Flame: максимум 3 слота; остальные — другие коллекции.']:[]),
   ...(run.discoveryIndex!==undefined?[`Дополнительный сбор Black: ${run.discoveryIndex}/${run.discoveryTotal??132} коллекций.`]:[]),

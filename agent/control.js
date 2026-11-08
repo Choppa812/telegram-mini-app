@@ -31,7 +31,7 @@ export async function handleCommand(update, { ownerId, store, send, checkApi, ma
   const m = update?.message;
   if (!ownerId || m?.chat?.type !== 'private' || String(m?.from?.id) !== String(ownerId) || String(m?.chat?.id) !== String(ownerId)) return false;
   const command = (m.text || '').trim().split(/\s/)[0].split('@')[0].toLowerCase();
-  if (!['/start', '/help', '/status', '/report', '/pause', '/resume', '/checkapi', '/market', '/floors', '/highfloors', '/inspect', '/fees', '/rank', '/blackday', '/blackscan', '/blackscan90', '/positions', '/models', '/marketsales', '/cross', '/variants', '/variant', '/variantcross', '/applyblack', '/apply28', '/applyall', '/applycompetitive', '/applyprestige', '/blackclean', '/catalogscan', '/catalogall', '/catalogreport', '/catalogreview', '/applyapproved', '/research28', '/researchstatus', '/applyresearch28', '/researchdiverse', '/applystatus', '/researchaudit', '/researchfill'].includes(command)) return false;
+  if (!['/start', '/help', '/status', '/report', '/pause', '/resume', '/checkapi', '/market', '/floors', '/highfloors', '/inspect', '/fees', '/rank', '/blackday', '/blackscan', '/blackscan90', '/positions', '/models', '/marketsales', '/cross', '/variants', '/variant', '/variantcross', '/applyblack', '/apply28', '/applyall', '/applycompetitive', '/applyprestige', '/blackclean', '/catalogscan', '/catalogall', '/catalogreport', '/catalogreview', '/applyapproved', '/research28', '/researchstatus', '/applyresearch28', '/researchdiverse', '/applystatus', '/researchaudit', '/researchfill', '/researchall'].includes(command)) return false;
   if (!Number.isSafeInteger(update.update_id)) return false;
   if(['/applyapproved','/applyblack','/apply28','/applyall','/applycompetitive','/applyprestige','/blackclean'].includes(command)&&await store.getActiveResearchPlan?.()){
     await send('Для аккаунта опубликован новый полный портфель. Старые команды не применяются; /positions — текущие настройки, /applyresearch28 — продолжить применение полного плана.');
@@ -42,8 +42,8 @@ export async function handleCommand(update, { ownerId, store, send, checkApi, ma
  }else if(command==='/applyresearch28'){
  if(await store.isPaused())await send('Автонастройка на паузе.');
  else try{await send(await applyResearch());}catch{await send('Применение не запущено: нужен завершённый свежий анализ 28 вариантов либо восстановление доступа. Слоты не менялись.');}
- }else if(command==='/research28'||command==='/researchstatus'||command==='/researchdiverse'||command==='/researchaudit'||command==='/researchfill'){
- try{await send(command==='/researchstatus'?await researchStatus():await research28(command==='/researchdiverse',command==='/researchaudit',command==='/researchfill'));}catch{await send('Подбор портфеля недоступен. Слоты не менялись.');}
+ }else if(command==='/research28'||command==='/researchstatus'||command==='/researchdiverse'||command==='/researchaudit'||command==='/researchfill'||command==='/researchall'){
+ try{await send(command==='/researchstatus'?await researchStatus():await research28(command==='/researchdiverse',command==='/researchaudit',command==='/researchfill',command==='/researchall'));}catch{await send('Подбор портфеля недоступен. Слоты не менялись.');}
  }else if(command==='/applyapproved'){
  if(await store.isPaused())await send('Автонастройка на паузе.');
  else try{const row=await applyApproved({beforeWrite:async()=>{if(await store.isPaused())throw new Error('AUTOMATION_PAUSED');}});await send('Trapped Heart / Heartworm / Desert Sand: '+(row.changed?'изменено':row.reason)+'; цена '+(row.price??'—')+' TON. Результат проверен API.');}catch(error){await send('Настройка не завершена: '+safeFailureCode(error));}
