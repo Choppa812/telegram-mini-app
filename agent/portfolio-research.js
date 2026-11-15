@@ -39,7 +39,7 @@ export function rankResearch(rows){
   Math.min(b.history.day.count,b.history.week.count/7)-Math.min(a.history.day.count,a.history.week.count/7)||
   b.history.week.count-a.history.week.count||a.collection.localeCompare(b.collection))).slice(0,28);
 }
-export async function startResearch({store,key,enqueue,diversify=false,audit=false,fill=false,all=false,retry=false,wait=ms=>new Promise(resolve=>setTimeout(resolve,ms))}){
+export async function startResearch({store,key,enqueue,send,diversify=false,audit=false,fill=false,all=false,retry=false,scheduledDay,accountReader=readSatellite,wait=ms=>new Promise(resolve=>setTimeout(resolve,ms))}){
  // Queue sends are pinned to the sending deployment. A correction must acquire
  // the shared checkpoint between steps and resume from the current deployment,
  // rather than letting an old running worker overwrite the revised proposal.
@@ -50,6 +50,17 @@ export async function startResearch({store,key,enqueue,diversify=false,audit=fal
  if(!lease)throw Error('RESEARCH_BUSY');
  try{
   let previous=await store.getResearchRun();
+  if(scheduledDay){
+   if(await store.isPaused())return {status:'paused'};
+   const active=await store.getActiveResearchPlan();
+   if(active&&active.status!=='completed')return {status:'busy'};
+   if(previous?.scheduledDay===scheduledDay&&['completed','insufficient'].includes(previous.status)){
+    if(!previous.notifiedAt){await sendScheduledResearch(previous,store,send);}
+    return {status:'completed',duplicate:true};
+   }
+   // A running manual scan must not be overwritten by the timer.
+   if(['running','discovering'].includes(previous?.status)&&!previous.scheduledDay)return {status:'busy'};
+  }
   if(retry){
    if(!previous?.fullCatalog||!['completed','insufficient'].includes(previous.status))return 'Сначала дождитесь завершения полного обхода.';
    const retryIndices=previous.coverage.flatMap((r,i)=>!r.complete&&r.error!=='PAGE_LIMIT_REACHED'?[i]:[]);
@@ -65,10 +76,10 @@ export async function startResearch({store,key,enqueue,diversify=false,audit=fal
     await enqueue('catalog-scan',{kind:'research',run:previous.id,index:previous.index,...(previous.status==='discovering'?{discoveryIndex:previous.discoveryIndex}:{})},{idempotencyKey:previous.id+':all-resume:'+previous.index+':'+previous.discoveryIndex+':'+Math.floor(Date.now()/60000),retentionSeconds:604800});
     return researchText(previous);
    }
-   const [profile,subs]=await Promise.all([readSatellite('/user/me',{},key,'token'),readSatellite('/user/subscriptions',{},key,'token')]);
+   const [profile,subs]=await Promise.all([accountReader('/user/me',{},key,'token'),accountReader('/user/subscriptions',{},key,'token')]);
    if(!profile.ok||!subs.ok||!Array.isArray(subs.data)||subs.data.length!==28)throw Error('ACCOUNT_READ_FAILED');
    const balance=Number(profile.data.tonBalance);if(!Number.isFinite(balance)||balance<=0)throw Error('INVALID_BALANCE');
-   const run={id:randomUUID(),scope:'Black',fullCatalog:true,status:'discovering',startedAt:Date.now(),index:0,balance,slots:subs.data,candidates:[],selected:[],qualified:[],rejected:[],coverage:[],collectionCaps:{'Chill Flame':3},discoveryIndex:0};
+   const run={id:randomUUID(),scope:'Black',fullCatalog:true,status:'discovering',startedAt:Date.now(),index:0,balance,slots:subs.data,candidates:researchCandidates([],balance,'',subs.data),selected:[],qualified:[],rejected:[],coverage:[],collectionCaps:{'Chill Flame':3},discoveryIndex:0,...(scheduledDay?{scheduledDay}: {})};
    await store.saveResearchRun(run);await store.releaseCatalogLease(lease);
    await enqueue('catalog-scan',{kind:'research',run:run.id,index:0,discoveryIndex:0},{idempotencyKey:run.id+':all:0',retentionSeconds:604800});
    return researchText(run);
@@ -158,7 +169,12 @@ export async function startResearch({store,key,enqueue,diversify=false,audit=fal
 export async function processResearchStep(message,{store,key,send,enqueue,variantReader=readVariant,marketReader=readCrossMarket,scan=scanCatalog}){
  const lease=await store.acquireCatalogLease();if(!lease)throw Error('RESEARCH_BUSY');
  try{
-  const run=await store.getResearchRun();if(!run||run.id!==message.run||!['running','discovering'].includes(run.status))return;
+  const run=await store.getResearchRun();if(!run||run.id!==message.run)return;
+  if(run.scheduledDay&&await store.isPaused())return;
+  if(!['running','discovering'].includes(run.status)){
+   if(run.scheduledDay&&!run.notifiedAt)await sendScheduledResearch(run,store,send);
+   return;
+  }
   if(run.status==='discovering'){
    if(message.discoveryIndex===run.discoveryIndex){
     const result=await scan(key,{offset:run.discoveryIndex,limit:1,maxPages:60,backdrop:'Black'});
@@ -182,7 +198,8 @@ export async function processResearchStep(message,{store,key,send,enqueue,varian
      if(['completed','insufficient'].includes(run.status))run.finishedAt=Date.now();
     }else run.status=run.index<run.candidates.length?'running':run.discoveryIndex<result.catalogTotal?'discovering':'insufficient';
     await store.saveResearchRun(run);
-    if(run.status==='insufficient'||run.discoveryIndex%10===0)try{await send(researchText(run));}catch{}
+    if(!run.scheduledDay&&(run.status==='insufficient'||run.discoveryIndex%10===0))try{await send(researchText(run));}catch{}
+    if(run.scheduledDay&&['completed','insufficient'].includes(run.status))await sendScheduledResearch(run,store,send);
    }
    await store.releaseCatalogLease(lease);
    if(run.status==='discovering')await enqueue('catalog-scan',{kind:'research',run:run.id,index:run.index,discoveryIndex:run.discoveryIndex},{idempotencyKey:run.id+':discover:'+run.discoveryIndex,retentionSeconds:604800});
@@ -224,7 +241,8 @@ export async function processResearchStep(message,{store,key,send,enqueue,varian
    if(['completed','insufficient'].includes(run.status))run.finishedAt=Date.now();
    if(run.status==='discovering'&&run.discoveryIndex===undefined)run.discoveryIndex=0;
    await store.saveResearchRun(run);
-   if(run.status!=='running'||run.index%10===0)try{await send(researchText(run));}catch{}
+   if(!run.scheduledDay&&(run.status!=='running'||run.index%10===0))try{await send(researchText(run));}catch{}
+   if(run.scheduledDay&&['completed','insufficient'].includes(run.status))await sendScheduledResearch(run,store,send);
   }
   if(run.status==='discovering'){
    await store.releaseCatalogLease(lease);
@@ -237,6 +255,21 @@ export async function processResearchStep(message,{store,key,send,enqueue,varian
   }
  }finally{await store.releaseCatalogLease(lease);}
 }
+async function sendScheduledResearch(run,store,send){
+ if(!send||run.notifiedAt||await store.isPaused())return;
+ // Telegram rejects messages above 4096 characters. Persist delivery progress
+ // so a transient failure on the second part does not repeat the first part.
+ const parts=[''];
+ for(const line of researchText(run).split('\n')){
+  if(parts.at(-1).length+line.length+1>3800)parts.push('');
+  parts[parts.length-1]+=(parts.at(-1)?'\n':'')+line;
+ }
+ for(let i=run.reportPartsSent||0;i<parts.length;i++){
+  if(await store.isPaused())return;
+  await send(parts[i]);run.reportPartsSent=i+1;await store.saveResearchRun(run);
+ }
+ run.notifiedAt=Date.now();await store.saveResearchRun(run);
+}
 export function researchText(run){
  if(!run)return 'Подбор портфеля ещё не запущен.';
  const lines=[`Подбор 28 слотов только Black: ${run.status}; проверено ${run.index}/${run.candidates.length}; подтверждено ${run.selected.length}/28.`,
@@ -248,7 +281,9 @@ export function researchText(run){
   ...(run.discoveryIndex!==undefined&&!run.fullCatalog?[`Дополнительный сбор Black: ${run.discoveryIndex}/${run.discoveryTotal??132} коллекций.`]:[]),
   ...(run.status==='running'?[`Следующий: ${run.candidates[run.index]?.collection} / ${run.candidates[run.index]?.model} / ${run.candidates[run.index]?.backdrop}.`]:[]),
   ...run.selected.map((r,i)=>`${i+1}. ${r.collection} / ${r.model} / ${r.backdrop}: до ${r.ceiling.toFixed(2)} TON; ${r.history.day.count}/${r.history.week.count} продаж.`),
-  'Требуется полная точная история: минимум 2 продажи за сутки и 8 за неделю. Ценовые расхождения более чем вдвое исключаются. Покупка: 3%; продажа: резерв 2%; запас 1,5 TON. Это анализ; слоты не изменялись.'];
+  ...(run.scheduledDay?[`Ежедневный поиск за ${run.scheduledDay}. Новых сочетаний в подборке: ${run.selected.filter(r=>!run.slots.some(s=>s.collectionName===r.collection&&JSON.stringify(s.modelNames)==JSON.stringify([r.model])&&JSON.stringify(s.backdropNames)==JSON.stringify([r.backdrop]))).length}.`,
+   'Источники: агрегатор Gift Satellite по пяти площадкам. Новый состав — только после вашего согласования; /researchdetails 0–3 — основания.']:[]),
+  'Требуется полная точная история: минимум 2 продажи за сутки и 8 за неделю. Ценовые расхождения более чем вдвое исключаются. Покупка: 3%; продажа: резерв 2%; запас 1,5 TON до переводов. Это анализ; слоты не изменялись.'];
  return lines.join('\n');
 }
 

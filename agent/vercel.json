@@ -1,6 +1,14 @@
 {
   "crons": [
     {
+      "path": "/api/research-daily",
+      "schedule": "0 16 * * *"
+    },
+    {
+      "path": "/api/research-retry",
+      "schedule": "0 18 * * *"
+    },
+    {
       "path": "/api/daily",
       "schedule": "0 15 * * *"
     },
@@ -14,6 +22,12 @@
     }
   ],
   "functions": {
+    "api/research-daily.js": {
+      "maxDuration": 300
+    },
+    "api/research-retry.js": {
+      "maxDuration": 300
+    },
     "api/daily.js": {
       "maxDuration": 300
     },
