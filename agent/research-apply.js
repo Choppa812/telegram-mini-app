@@ -1,5 +1,6 @@
 import { readSatellite } from './satellite.js';
 import { applyPortfolioSlot } from './portfolio.js';
+import {researchToken,confirmationText} from './research-confirmation.js';
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const fits=(s,r)=>s.collectionName===r.collection&&same(s.modelNames,[r.model])&&same(s.backdropNames,[r.backdrop]);
 export function assignResearchSlots(selected,slots){
@@ -20,24 +21,29 @@ export function assignResearchSlots(selected,slots){
    collection:row.collection,model:row.model,backdrop:row.backdrop,ceiling:row.ceiling,minDay:2,minWeek:8,pricing:'competitive',manualActivation:true,preserveExisting:row.retained===true,replaces};
  }).sort((a,b)=>a.slot-b.slot);
 }
-export async function startResearchApply({store,key,enqueue}){
+export async function startResearchApply({store,key,enqueue,confirmation,accountReader=readSatellite,now=Date.now()}){
  const lease=await store.acquireCatalogLease();if(!lease)throw Error('BUSY');
  try{
   if(await store.isPaused())return 'Автонастройка на паузе. Слоты не менялись.';
   const existing=await store.getActiveResearchPlan();
+  const research=await store.getResearchRun();
+  if(confirmation){
+   if(!/^[a-f0-9]{16}$/.test(confirmation)||!research||confirmation!==researchToken(research))return 'Этот план уже заменён новым. /researchstatus — актуальная подборка. Слоты не менялись.';
+  }else if(existing?.status!=='applying')return confirmationText(research,now);
   if(existing?.status==='blocked')return `Применение остановлено на слоте ${existing.failedSlot??'?'}. Повторная запись заблокирована до проверки фактического состояния через API. /positions — текущие настройки.`;
   if(existing?.status==='applying'){
+   if(confirmation&&existing.id!==research.id)return 'Сначала дождитесь завершения уже подтверждённого плана. /status — состояние.';
    await store.releaseCatalogLease(lease);
    await enqueue('catalog-scan',{kind:'research-apply',run:existing.id,index:existing.index},{idempotencyKey:'apply:'+existing.id+':resume:'+existing.index+':'+Math.floor(Date.now()/60000),retentionSeconds:604800});
    return 'Применение полного портфеля уже выполняется.';
   }
-  const research=await store.getResearchRun();
   // The approved composition and ceilings remain fixed. Fresh complete sales,
   // offers and account balance are required by applyPortfolioSlot before EVERY
   // write, including when the owner activates a morning plan in the evening.
   if(research?.scope!=='Black'||research?.collectionCaps?.['Chill Flame']!==3||research?.status!=='completed'||research.selected?.length!==28)throw Error('FRESH_FULL_RESEARCH_REQUIRED');
   if(existing?.id===research.id)return 'Этот портфель уже применён. Проверьте /positions.';
-  const response=await readSatellite('/user/subscriptions',{},key,'token');
+  if(!Number.isFinite(research.finishedAt)||now-research.finishedAt>86400000||research.finishedAt>now)return 'Подбор устарел. Дождитесь нового ежедневного анализа. Слоты не менялись.';
+  const response=await accountReader('/user/subscriptions',{},key,'token');
   if(!response.ok||!Array.isArray(response.data))throw Error('ACCOUNT_READ_FAILED');
   if(research.preserveExisting&&research.selected.filter(r=>r.retained).some(r=>!response.data.some(s=>fits(s,r)&&s.portalsAutobuy===true&&s.portalsAutobuyQuantity===1&&Math.abs(Number(s.portalsAutobuyMaxPrice)-r.ceiling)<.001)))throw Error('PRESERVED_SLOT_CHANGED');
   const plan={id:research.id,status:'applying',index:0,rows:assignResearchSlots(research.selected,response.data),results:[]};

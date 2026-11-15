@@ -31,7 +31,7 @@ export async function handleCommand(update, { ownerId, store, send, checkApi, ma
   const m = update?.message;
   if (!ownerId || m?.chat?.type !== 'private' || String(m?.from?.id) !== String(ownerId) || String(m?.chat?.id) !== String(ownerId)) return false;
   const command = (m.text || '').trim().split(/\s/)[0].split('@')[0].toLowerCase();
-  if (!['/start', '/help', '/status', '/report', '/pause', '/resume', '/checkapi', '/market', '/floors', '/highfloors', '/inspect', '/fees', '/rank', '/blackday', '/blackscan', '/blackscan90', '/positions', '/models', '/marketsales', '/cross', '/variants', '/variant', '/variantcross', '/applyblack', '/apply28', '/applyall', '/applycompetitive', '/applyprestige', '/blackclean', '/catalogscan', '/catalogall', '/catalogreport', '/catalogreview', '/applyapproved', '/research28', '/researchstatus', '/applyresearch28', '/researchdiverse', '/applystatus', '/researchaudit', '/researchfill', '/researchall', '/researchdetails', '/researchretry'].includes(command)) return false;
+  if (!['/start', '/help', '/status', '/report', '/pause', '/resume', '/checkapi', '/market', '/floors', '/highfloors', '/inspect', '/fees', '/rank', '/blackday', '/blackscan', '/blackscan90', '/positions', '/models', '/marketsales', '/cross', '/variants', '/variant', '/variantcross', '/applyblack', '/apply28', '/applyall', '/applycompetitive', '/applyprestige', '/blackclean', '/catalogscan', '/catalogall', '/catalogreport', '/catalogreview', '/applyapproved', '/research28', '/researchstatus', '/applyresearch28', '/researchdiverse', '/applystatus', '/researchaudit', '/researchfill', '/researchall', '/researchdetails', '/researchretry', '/confirmplan'].includes(command)) return false;
   if (!Number.isSafeInteger(update.update_id)) return false;
   if(['/applyapproved','/applyblack','/apply28','/applyall','/applycompetitive','/applyprestige','/blackclean'].includes(command)&&await store.getActiveResearchPlan?.()){
     await send('Для аккаунта опубликован новый полный портфель. Старые команды не применяются; /positions — текущие настройки, /applyresearch28 — продолжить применение полного плана.');
@@ -43,9 +43,9 @@ export async function handleCommand(update, { ownerId, store, send, checkApi, ma
  const arg=(m.text||'').trim().split(/\s+/)[1];const page=Number(arg);
  if(!arg||!Number.isInteger(page)||page<0||page>3)await send('Укажите страницу /researchdetails 0–3.');
  else try{await send(await researchDetails(page));}catch{await send('Детали подбора недоступны. Слоты не менялись.');}
- }else if(command==='/applyresearch28'){
+ }else if(command==='/applyresearch28'||command==='/confirmplan'){
  if(await store.isPaused())await send('Автонастройка на паузе.');
- else try{await send(await applyResearch());}catch{await send('Применение не запущено: нужен завершённый свежий анализ 28 вариантов либо восстановление доступа. Слоты не менялись.');}
+ else try{const token=command==='/confirmplan'?(m.text||'').trim().split(/\s+/)[1]:undefined; if(command==='/confirmplan'&&!/^[a-f0-9]{16}$/.test(token||''))await send('Используйте команду подтверждения из итогового отчёта: /researchstatus.');else await send(await applyResearch(token));}catch{await send('Применение не запущено: нужен завершённый свежий анализ 28 вариантов либо восстановление доступа. Слоты не менялись.');}
  }else if(command==='/research28'||command==='/researchstatus'||command==='/researchdiverse'||command==='/researchaudit'||command==='/researchfill'||command==='/researchall'||command==='/researchretry'){
  try{await send(command==='/researchstatus'?await researchStatus():await research28(command==='/researchdiverse',command==='/researchaudit',command==='/researchfill',command==='/researchall',command==='/researchretry'));}catch(error){const code=/^(ACCOUNT_READ_FAILED|INVALID_BALANCE|RESEARCH_BUSY|STORE_UNAVAILABLE|STORE_COMMAND_FAILED|SATELLITE_CONFIGURATION_MISSING)$/.test(error.message)?error.message:'RESEARCH_UNAVAILABLE';await send('Подбор портфеля недоступен: '+code+'. Слоты не менялись.');}
  }else if(command==='/applyapproved'){

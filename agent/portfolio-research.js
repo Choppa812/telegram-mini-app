@@ -4,6 +4,7 @@ import { readCrossMarket } from './cross.js';
 import { readSatellite } from './satellite.js';
 import { competitivePrice } from './competitive.js';
 import { scanCatalog } from './catalog-scan.js';
+import {confirmationText,confirmationKeyboard} from './research-confirmation.js';
 
 const identity=r=>JSON.stringify([r.collection,r.model,r.backdrop]);
 export function consistentPrices(history){
@@ -266,7 +267,7 @@ async function sendScheduledResearch(run,store,send){
  }
  for(let i=run.reportPartsSent||0;i<parts.length;i++){
   if(await store.isPaused())return;
-  await send(parts[i]);run.reportPartsSent=i+1;await store.saveResearchRun(run);
+  await send(parts[i],i===parts.length-1&&run.status==='completed'?{reply_markup:confirmationKeyboard(run)}:{});run.reportPartsSent=i+1;await store.saveResearchRun(run);
  }
  run.notifiedAt=Date.now();await store.saveResearchRun(run);
 }
@@ -284,6 +285,7 @@ export function researchText(run){
   ...(run.scheduledDay?[`Ежедневный поиск за ${run.scheduledDay}. Новых сочетаний в подборке: ${run.selected.filter(r=>!run.slots.some(s=>s.collectionName===r.collection&&JSON.stringify(s.modelNames)==JSON.stringify([r.model])&&JSON.stringify(s.backdropNames)==JSON.stringify([r.backdrop]))).length}.`,
    'Источники: агрегатор Gift Satellite по пяти площадкам. Новый состав — только после вашего согласования; /researchdetails 0–3 — основания.']:[]),
   'Требуется полная точная история: минимум 2 продажи за сутки и 8 за неделю. Ценовые расхождения более чем вдвое исключаются. Покупка: 3%; продажа: резерв 2%; запас 1,5 TON до переводов. Это анализ; слоты не изменялись.'];
+ if(run.status==='completed')lines.push(confirmationText(run));
  return lines.join('\n');
 }
 

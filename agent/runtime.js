@@ -67,8 +67,8 @@ export function runtime(env = process.env, fetcher = fetch) {
     finishDay: day => redis('SET', `${prefix}done:${day}`, '1', 'EX', '259200'),
     releaseDay: (day, lease) => redis('EVAL', "if redis.call('GET',KEYS[1])==ARGV[1] then return redis.call('DEL',KEYS[1]) end; return 0", 1, `${prefix}lease:${day}`, lease),
   };
-  const send = async text => {
-    const response = await fetcher(`https://api.telegram.org/bot${env.CONTROL_BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: env.CONTROL_OWNER_ID, text, reply_markup: { keyboard: [[{ text: '/status' }, { text: '/report' }], [{ text: '/pause' }, { text: '/resume' }]], resize_keyboard: true } }), signal: AbortSignal.timeout(10000) });
+  const send = async (text,options={}) => {
+    const response = await fetcher(`https://api.telegram.org/bot${env.CONTROL_BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: env.CONTROL_OWNER_ID, text, reply_markup: options.reply_markup || { keyboard: [[{ text: '/status' }, { text: '/report' }], [{ text: '/pause' }, { text: '/resume' }]], resize_keyboard: true } }), signal: AbortSignal.timeout(10000) });
     if (!response.ok || !(await response.json()).ok) throw new Error('REPORT_DELIVERY_FAILED');
   };
   return { ownerId: env.CONTROL_OWNER_ID, store, send };
