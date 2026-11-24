@@ -1,4 +1,5 @@
 import { randomUUID, timingSafeEqual } from 'node:crypto';
+import { menuKeyboard } from './bot-menu.js';
 
 export function sameSecret(actual, expected) {
   if (typeof actual !== 'string' || !expected) return false;
@@ -56,6 +57,8 @@ export function runtime(env = process.env, fetcher = fetch) {
     releaseFullPortfolio: lease => redis('EVAL', "if redis.call('GET',KEYS[1])==ARGV[1] then return redis.call('DEL',KEYS[1]) end; return 0", 1, `${prefix}full-portfolio-lease`, lease),
     command: async (id, paused) => redis('EVAL', "local old=redis.call('GET',KEYS[1]); if old and tonumber(old)>=tonumber(ARGV[1]) then return 0 end; redis.call('SET',KEYS[1],ARGV[1]); redis.call('SET',KEYS[2],ARGV[2]); return 1", 2, `${prefix}update`, `${prefix}paused`, String(id), paused ? '1' : '0'),
     getReport: async () => decode(await redis('GET', `${prefix}report`)),
+    getLastSuccessfulReport: async () => decode(await redis('GET', `${prefix}last-successful-report`)),
+    saveLastSuccessfulReport: report => redis('SET', `${prefix}last-successful-report`, JSON.stringify({date:report.date})),
     saveReport: report => redis('SET', `${prefix}report`, JSON.stringify(report)),
     getDayReport: async day => decode(await redis('GET', `${prefix}result:${day}`)),
     saveDayReport: (day, report) => redis('SET', `${prefix}result:${day}`, JSON.stringify(report), 'EX', '259200'),
@@ -68,7 +71,7 @@ export function runtime(env = process.env, fetcher = fetch) {
     releaseDay: (day, lease) => redis('EVAL', "if redis.call('GET',KEYS[1])==ARGV[1] then return redis.call('DEL',KEYS[1]) end; return 0", 1, `${prefix}lease:${day}`, lease),
   };
   const send = async (text,options={}) => {
-    const response = await fetcher(`https://api.telegram.org/bot${env.CONTROL_BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: env.CONTROL_OWNER_ID, text, reply_markup: options.reply_markup || { keyboard: [[{ text: '/status' }, { text: '/report' }], [{ text: '/pause' }, { text: '/resume' }]], resize_keyboard: true } }), signal: AbortSignal.timeout(10000) });
+    const response = await fetcher(`https://api.telegram.org/bot${env.CONTROL_BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: env.CONTROL_OWNER_ID, text, reply_markup: options.reply_markup || menuKeyboard() }), signal: AbortSignal.timeout(10000) });
     if (!response.ok || !(await response.json()).ok) throw new Error('REPORT_DELIVERY_FAILED');
   };
   return { ownerId: env.CONTROL_OWNER_ID, store, send };

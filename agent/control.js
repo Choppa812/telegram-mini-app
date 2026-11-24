@@ -1,4 +1,5 @@
 import { splitTelegramText } from './portfolio-research.js';
+import { menuCommand } from './bot-menu.js';
 
 export const STOP_NOTICE = 'Автонастройка и ежедневные сообщения остановлены до /resume. Уже отправленный запрос может завершиться. Автопокупка в Gift Satellite продолжает работать по ранее установленным лимитам.';
 
@@ -29,12 +30,24 @@ export function reportText(report) {
   ].filter(Boolean).join('\n');
 }
 
-export async function handleCommand(update, { ownerId, store, send, checkApi, marketOverview, floorOverview, highBlackFloors, inspectGift, feeOverview, turnoverOverview, blackDailySales, blackScan, positionsOverview, blackModels, modelMarkets, crossMarket, variantLeads, variantDetail, variantCross, applyBlack, apply28, applyAll, applyCompetitive, applyPrestige, cleanBlack, catalogScan, catalogAll, reviewCatalog, applyApproved, research28, researchStatus, researchDetails, applyResearch, applyStatus }) {
-  const m = update?.message;
+export async function handleCommand(update, { ownerId, store, send, checkApi, marketOverview, floorOverview, highBlackFloors, inspectGift, feeOverview, turnoverOverview, blackDailySales, blackScan, positionsOverview, blackModels, modelMarkets, crossMarket, variantLeads, variantDetail, variantCross, applyBlack, apply28, applyAll, applyCompetitive, applyPrestige, cleanBlack, catalogScan, catalogAll, reviewCatalog, applyApproved, research28, researchStatus, researchDetails, applyResearch, applyStatus, dashboard, planView }) {
+  let m = update?.message;
   if (!ownerId || m?.chat?.type !== 'private' || String(m?.from?.id) !== String(ownerId) || String(m?.chat?.id) !== String(ownerId)) return false;
+  m = {...m,text:menuCommand(typeof m.text==='string' ? m.text.trim() : '')};
   const command = (m.text || '').trim().split(/\s/)[0].split('@')[0].toLowerCase();
-  if (!['/start', '/help', '/status', '/report', '/pause', '/resume', '/checkapi', '/market', '/floors', '/highfloors', '/inspect', '/fees', '/rank', '/blackday', '/blackscan', '/blackscan90', '/positions', '/models', '/marketsales', '/cross', '/variants', '/variant', '/variantcross', '/applyblack', '/apply28', '/applyall', '/applycompetitive', '/applyprestige', '/blackclean', '/catalogscan', '/catalogall', '/catalogreport', '/catalogreview', '/applyapproved', '/research28', '/researchstatus', '/applyresearch28', '/researchdiverse', '/applystatus', '/researchaudit', '/researchfill', '/researchall', '/researchdetails', '/researchretry', '/confirmplan'].includes(command)) return false;
   if (!Number.isSafeInteger(update.update_id)) return false;
+  if(command==='/dashboard'||command==='/plan'){
+    try {
+      if(command==='/dashboard') await send(await dashboard());
+      else {
+        const view=await planView();
+        const parts=splitTelegramText(view.text);
+        for(const [index,part] of parts.entries())await send(part,index===parts.length-1?view.options:undefined);
+      }
+    } catch { await send('Не удалось загрузить данные. Повторите запрос через меню.'); }
+    return true;
+  }
+  if (!['/start', '/help', '/status', '/report', '/pause', '/resume', '/checkapi', '/market', '/floors', '/highfloors', '/inspect', '/fees', '/rank', '/blackday', '/blackscan', '/blackscan90', '/positions', '/models', '/marketsales', '/cross', '/variants', '/variant', '/variantcross', '/applyblack', '/apply28', '/applyall', '/applycompetitive', '/applyprestige', '/blackclean', '/catalogscan', '/catalogall', '/catalogreport', '/catalogreview', '/applyapproved', '/research28', '/researchstatus', '/applyresearch28', '/researchdiverse', '/applystatus', '/researchaudit', '/researchfill', '/researchall', '/researchdetails', '/researchretry', '/confirmplan'].includes(command)) return false;
   if(['/applyapproved','/applyblack','/apply28','/applyall','/applycompetitive','/applyprestige','/blackclean'].includes(command)&&await store.getActiveResearchPlan?.()){
     await send('Для аккаунта опубликован новый полный портфель. Старые команды не применяются; /positions — текущие настройки, /applyresearch28 — продолжить применение полного плана.');
     return true;
@@ -44,7 +57,10 @@ export async function handleCommand(update, { ownerId, store, send, checkApi, ma
  }else if(command==='/researchdetails'){
  const arg=(m.text||'').trim().split(/\s+/)[1];const page=Number(arg);
  if(!arg||!Number.isInteger(page)||page<0||page>3)await send('Укажите страницу /researchdetails 0–3.');
- else try{for(const part of splitTelegramText(await researchDetails(page)))await send(part);}catch{await send('Детали подбора недоступны. Слоты не менялись.');}
+ else try{
+   const view=planView ? await planView(page) : {text:await researchDetails(page)};
+   for(const part of splitTelegramText(view.text))await send(part,view.options);
+ }catch{await send('Детали подбора недоступны. Слоты не менялись.');}
  }else if(command==='/applyresearch28'||command==='/confirmplan'){
  if(await store.isPaused())await send('Автонастройка на паузе.');
  else try{const token=command==='/confirmplan'?(m.text||'').trim().split(/\s+/)[1]:undefined; if(command==='/confirmplan'&&!/^[a-f0-9]{16}$/.test(token||''))await send('Используйте команду подтверждения из итогового отчёта: /researchstatus.');else await send(await applyResearch(token));}catch{await send('Применение не запущено: нужен завершённый свежий анализ 28 вариантов либо восстановление доступа. Слоты не менялись.');}
@@ -261,6 +277,9 @@ export async function dailyReport({ store, send, run, now = new Date(), notifyOn
       return { ...report, retryable: true, silent: !notifyOnError };
     }
     await store.saveDayReport(day, report);
+    if(report.status==='completed' && store.saveLastSuccessfulReport) {
+      try { await store.saveLastSuccessfulReport(report); } catch {}
+    }
     await send(reportText(report));
     await store.finishDay(day);
     return report;

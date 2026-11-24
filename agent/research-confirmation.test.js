@@ -15,7 +15,7 @@ function setup(){
 test('generic apply displays a plan-specific confirmation without publishing or enqueueing orders',async()=>{
  const f=setup();const text=await startResearchApply(f.deps);
  assert.match(text,new RegExp('/confirmplan '+researchToken(f.research)));assert.equal(f.active,null);assert.equal(f.reads,0);assert.equal(f.queued.length,0);
- assert.equal(confirmationKeyboard(f.research).keyboard[0][0].text,'/confirmplan '+researchToken(f.research));
+ assert.ok(confirmationKeyboard(f.research).keyboard.flat().some(button=>button.text==='Подтвердить этот план · '+researchToken(f.research)));
 });
 test('stale confirmation cannot activate a revised composition or increased ceiling',async()=>{
  const f=setup(),token=researchToken(f.research);f.research.selected[0].ceiling++;

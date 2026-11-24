@@ -92,7 +92,12 @@ export async function processResearchApply(message,{store,key,send,enqueue,apply
    if(plan.status==='completed'){
     const verified=await readSatellite('/user/subscriptions',{},key,'token');
     const active=verified.ok&&Array.isArray(verified.data)?plan.rows.filter(r=>verified.data.some(s=>s._id===r.subscriptionId&&fits(s,r)&&s.portalsAutobuy===true&&s.portalsAutobuyQuantity===1)).length:null;
-    await send(`Полный портфель: проверено 28 слотов; активных совпадений ${active??'не удалось проверить'}/28. Изменено ${plan.results.filter(r=>r.changed).length}. /positions — фактические настройки. Лимиты пересчитаны по рынку и проверены API.`);
+    const inactive = plan.results.filter(row=>row.disabled||['INSUFFICIENT_EXACT_SALES','BALANCE_INSUFFICIENT_FOR_SINGLE_PURCHASE'].includes(row.reason));
+    const reasons = inactive.map(row=>`№${row.slot} — ${row.reason==='BALANCE_INSUFFICIENT_FOR_SINGLE_PURCHASE'?'не хватает баланса на покупку с комиссией':'недостаточно продаж точного сочетания'}`);
+    await send([
+     `Проверено 28 слотов. Активных совпадений с планом: ${active??'не удалось проверить'}/28. Изменено слотов: ${plan.results.filter(row=>row.changed).length}.`,
+     ...reasons,'/applystatus — результат по каждой позиции. /positions — фактические настройки.',
+    ].join('\n'));
    }
   }
   if(plan.status==='applying'){

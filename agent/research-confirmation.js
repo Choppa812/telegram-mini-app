@@ -1,4 +1,5 @@
 import {createHash} from 'node:crypto';
+import {menuKeyboard} from './bot-menu.js';
 
 export function researchToken(run){
  return createHash('sha256').update(JSON.stringify({id:run.id,scope:run.scope,
@@ -10,5 +11,5 @@ export function confirmationText(run,now=Date.now()){
  return `Проверить основания: /researchdetails 0–3.\nПодтвердить этот план и выставить автобай:\n/confirmplan ${researchToken(run)}\nПеред применением рынок и баланс проверяются заново. Цены могут быть ниже указанных потолков; слабые сочетания не включаются.`;
 }
 export function confirmationKeyboard(run){
- return {keyboard:[[{text:`/confirmplan ${researchToken(run)}`}],[{text:'/researchdetails 0'},{text:'/researchstatus'}],[{text:'/positions'},{text:'/pause'}]],resize_keyboard:true};
+ return menuKeyboard(researchToken(run));
 }

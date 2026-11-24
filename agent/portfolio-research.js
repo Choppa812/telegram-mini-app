@@ -78,6 +78,8 @@ export async function startResearch({store,key,enqueue,send,diversify=false,audi
    return researchText(run);
   }
   if(all){
+   if(await store.isPaused?.())return 'Автонастройка на паузе. Нажмите «Продолжить», чтобы запустить анализ.';
+   if(!scheduledDay && (await store.getActiveResearchPlan?.())?.status==='applying')return 'Сначала дождитесь завершения применения текущего плана.';
    if(previous?.fullCatalog&&['running','discovering'].includes(previous.status)){
     await store.releaseCatalogLease(lease);
     await enqueue('catalog-scan',{kind:'research',run:previous.id,index:previous.index,...(previous.status==='discovering'?{discoveryIndex:previous.discoveryIndex}:{})},{idempotencyKey:previous.id+':all-resume:'+previous.index+':'+previous.discoveryIndex+':'+Math.floor(Date.now()/60000),retentionSeconds:604800});
@@ -250,7 +252,12 @@ export async function processResearchStep(message,{store,key,send,enqueue,varian
    if(run.status==='discovering'&&run.discoveryIndex===undefined)run.discoveryIndex=0;
    run.progressAt=Date.now();
    await store.saveResearchRun(run);
-   if(!run.scheduledDay&&(run.status!=='running'||run.index%10===0))try{await send(researchText(run));}catch{}
+   if(!run.scheduledDay&&(run.status!=='running'||run.index%10===0))try{
+    const parts=splitTelegramText(researchText(run));
+    for(const [index,part] of parts.entries()){
+     await send(part,index===parts.length-1&&run.status==='completed'?{reply_markup:confirmationKeyboard(run)}:{});
+    }
+   }catch{}
    if(run.scheduledDay&&['completed','insufficient'].includes(run.status))await sendScheduledResearch(run,store,send);
   }
   if(run.status==='discovering'){

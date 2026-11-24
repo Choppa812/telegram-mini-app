@@ -21,6 +21,25 @@ function setup() {
 }
 const update = (id, text, from = 42, type = 'private') => ({ update_id: id, message: { from: { id: from }, chat: { id: from, type }, text } });
 
+test('Russian menu buttons use the same owner, pause and token guards as typed commands',async()=>{
+ const s=setup(), token='abcdef0123456789', seen=[];
+ const deps={...s,dashboard:async()=>{seen.push('status');return 'status';},
+  research28:async(...args)=>{assert.equal(args[3],true);seen.push('start');return 'start';},
+  planView:async page=>{seen.push(page??'plan');return {text:'plan',options:{}};},
+  applyResearch:async code=>{assert.equal(code,token);seen.push('confirmed');return 'confirmed';}};
+ await handleCommand(update(1,'Статус и баланс'),deps);
+ await handleCommand(update(2,'Запустить анализ'),deps);
+ await handleCommand(update(3,'Посмотреть план'),deps);
+ await handleCommand(update(4,'Основания 4'),deps);
+ await handleCommand(update(5,'Подтвердить этот план · '+token),deps);
+ await handleCommand(update(6,'Продолжить'),deps);
+ await handleCommand(update(7,'Подтвердить этот план · '+token,7),deps);
+ await handleCommand(update(8,'Подтвердить этот план · '+token),deps);
+ await handleCommand(update(9,'Пауза'),deps);
+ assert.deepEqual(seen,['status','start','plan',3,'confirmed']);
+ assert.equal(s.state.paused,true);
+});
+
 test('large research reports reach Telegram in parts, including the confirmation command',async()=>{
  const s=setup();
  const report='Строка '.repeat(750)+'\n/confirmplan abcdef0123456789';
