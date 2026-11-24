@@ -30,7 +30,9 @@ export async function startResearchApply({store,key,enqueue,confirmation,account
   if(confirmation){
    if(!/^[a-f0-9]{16}$/.test(confirmation)||!research||confirmation!==researchToken(research))return 'Этот план уже заменён новым. /researchstatus — актуальная подборка. Слоты не менялись.';
   }else if(existing?.status!=='applying')return confirmationText(research,now);
-  if(existing?.status==='blocked')return `Применение остановлено на слоте ${existing.failedSlot??'?'}. Повторная запись заблокирована до проверки фактического состояния через API. /positions — текущие настройки.`;
+  if(existing?.status==='blocked' && existing.id===research?.id) {
+   return 'Этот план остановлен. Подтвердите новую подборку. Повторное применение прежнего плана заблокировано.';
+  }
   if(existing?.status==='applying'){
    if(confirmation&&existing.id!==research.id)return 'Сначала дождитесь завершения уже подтверждённого плана. /status — состояние.';
    await store.releaseCatalogLease(lease);
@@ -45,6 +47,13 @@ export async function startResearchApply({store,key,enqueue,confirmation,account
   if(!Number.isFinite(research.finishedAt)||now-research.finishedAt>86400000||research.finishedAt>now)return 'Подбор устарел. Дождитесь нового ежедневного анализа. Слоты не менялись.';
   const response=await accountReader('/user/subscriptions',{},key,'token');
   if(!response.ok||!Array.isArray(response.data))throw Error('ACCOUNT_READ_FAILED');
+  if(existing?.status==='blocked'){
+   const interrupted=existing.rows?.find(row=>row.slot===existing.failedSlot);
+   const actual=response.data.find(slot=>slot._id===interrupted?.subscriptionId);
+   if(!interrupted?.subscriptionId || !actual || typeof actual.portalsAutobuy!=='boolean') {
+    return 'Не удалось прочитать фактическое состояние остановленного слота. Новый план не опубликован.';
+   }
+  }
   if(research.preserveExisting&&research.selected.filter(r=>r.retained).some(r=>!response.data.some(s=>fits(s,r)&&s.portalsAutobuy===true&&s.portalsAutobuyQuantity===1&&Math.abs(Number(s.portalsAutobuyMaxPrice)-r.ceiling)<.001)))throw Error('PRESERVED_SLOT_CHANGED');
   const plan={id:research.id,status:'applying',index:0,rows:assignResearchSlots(research.selected,response.data),results:[]};
   if(await store.isPaused())throw Error('AUTOMATION_PAUSED');

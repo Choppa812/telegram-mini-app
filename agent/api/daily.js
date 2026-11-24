@@ -10,6 +10,8 @@ export function createDailyHandler({ notifyOnError = false } = {}) { return asyn
       const key=process.env.GIFT_SATELLITE_API_KEY;
       const canonical=await context.store.getActiveResearchPlan();
       if(canonical){
+        if(canonical.status==='blocked')return {status:'blocked',checked:0,changed:0,skipped:0,
+          details:['Прежний план остановлен. Новый подбор доступен через /researchstatus. Повторное применение прежнего плана заблокировано.']};
         if(canonical.status!=='completed')throw Error('INITIAL_APPLY_RUNNING');
         return {status:'completed',...await applyPortfolio(key,{portfolio:canonical.rows,beforeWrite,onProgress})};
       }

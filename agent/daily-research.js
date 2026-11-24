@@ -11,7 +11,7 @@ export async function dailyResearchStatus(store, now = new Date()) {
  ]);
  const lines = [researchText(run)];
  if(paused) lines.push('Автонастройка на паузе. Плановый поиск приостановлен.');
- else if(active?.status === 'blocked') lines.push('Применение плана остановлено. /applystatus — состояние, /positions — фактические слоты.');
+ else if(active?.status === 'blocked') lines.push('Прежнее применение остановлено. Новый анализ доступен. Для замены нужен код свежего плана. /positions — фактические слоты.');
  else if(active?.status === 'applying') lines.push('Идёт применение подтверждённого плана. /applystatus — состояние.');
  else if(run?.scheduledDay !== day && daily?.status !== 'completed') {
   lines.push('Сегодняшний поиск ждёт успешной штатной проверки Vercel.');
@@ -28,7 +28,9 @@ export async function dailyResearch({store,key,send,enqueue,now=new Date(),start
  if(!key)throw Error('SATELLITE_CONFIGURATION_MISSING');
  const day=moscowDay(now);
  const daily=await store.getDayReport(day);
- if(daily?.status!=='completed')return {status:'waiting_for_daily_check'};
+ if(daily?.status!=='completed' && (await store.getActiveResearchPlan())?.status!=='blocked') {
+  return {status:'waiting_for_daily_check'};
+ }
  const result=await start({store,key,send,enqueue,all:true,scheduledDay:day});
  return typeof result==='string'?{status:'running'}:result;
 }

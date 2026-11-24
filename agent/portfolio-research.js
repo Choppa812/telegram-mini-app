@@ -56,7 +56,7 @@ export async function startResearch({store,key,enqueue,send,diversify=false,audi
   if(scheduledDay){
    if(await store.isPaused())return {status:'paused'};
    const active=await store.getActiveResearchPlan();
-   if(active&&active.status!=='completed')return {status:'busy'};
+   if(active?.status==='applying')return {status:'busy'};
    if(previous?.scheduledDay===scheduledDay&&['completed','insufficient'].includes(previous.status)){
     if(!previous.notifiedAt){await sendScheduledResearch(previous,store,send);}
     return {status:'completed',duplicate:true};

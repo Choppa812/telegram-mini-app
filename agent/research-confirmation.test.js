@@ -34,6 +34,18 @@ test('paused or expired confirmations cannot publish any orders',async()=>{
  assert.match(await startResearchApply({...f.deps,confirmation,now:f.deps.now+86400001}),/устарел/);
  assert.equal(f.active,null);assert.equal(f.reads,0);assert.equal(f.queued.length,0);
 });
+test('a blocked plan can only be superseded by a fresh confirmed plan after reading the interrupted slot',async()=>{
+ const f=setup(),confirmation=researchToken(f.research);
+ const blocked={id:f.research.id,status:'blocked',failedSlot:23,rows:[{slot:23,subscriptionId:'22'}]};
+ await f.deps.store.saveActiveResearchPlan(blocked);
+ assert.match(await startResearchApply({...f.deps,confirmation}),/план остановлен/);
+ assert.equal(f.reads,0);
+ await f.deps.store.saveActiveResearchPlan({...blocked,id:'previous'});
+ assert.match(await startResearchApply({...f.deps,confirmation,accountReader:async()=>({ok:true,data:[]})}),/Не удалось прочитать/);
+ assert.equal(f.queued.length,0);
+ assert.match(await startResearchApply({...f.deps,confirmation}),/Запущено/);
+ assert.equal(f.active.id,f.research.id);
+});
 test('bot confirmation is owner-only, private, well-formed and pause guarded',async()=>{
  const f=setup(),messages=[];let calls=0;const token=researchToken(f.research);
  const deps={ownerId:'42',store:f.deps.store,send:async text=>messages.push(text),applyResearch:async value=>{calls++;assert.equal(value,token);return 'queued';}};

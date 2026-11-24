@@ -55,6 +55,15 @@ test('status explains why a scheduled search is waiting',async()=>{
  f.deps.store.isPaused=async()=>true;
  assert.match(await dailyResearchStatus(f.deps.store),/на паузе/);
 });
+test('a blocked trading plan does not prevent read-only scheduled discovery',async()=>{
+ const f=fixture();
+ f.deps.store.getDayReport=async()=>({status:'blocked'});
+ f.deps.store.getActiveResearchPlan=async()=>({status:'blocked'});
+ const start = args=>startResearch({...f.deps,...args});
+ const now = new Date('2026-11-15T16:00:00Z');
+ assert.equal((await dailyResearch({...f.deps,start,now})).status,'running');
+ assert.equal(f.queued[0].kind,'research');
+});
 test('scheduled worker makes no API calls or notifications while paused',async()=>{
  const f=fixture({id:'r',scheduledDay:'2026-11-15',status:'discovering'});f.deps.store.isPaused=async()=>true;
  await processResearchStep({run:'r'}, {...f.deps,scan:async()=>assert.fail('scan while paused')});
