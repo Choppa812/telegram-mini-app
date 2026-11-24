@@ -21,6 +21,15 @@ function setup() {
 }
 const update = (id, text, from = 42, type = 'private') => ({ update_id: id, message: { from: { id: from }, chat: { id: from, type }, text } });
 
+test('large research reports reach Telegram in parts, including the confirmation command',async()=>{
+ const s=setup();
+ const report='Строка '.repeat(750)+'\n/confirmplan abcdef0123456789';
+ await handleCommand(update(1,'/researchstatus'),{...s,researchStatus:async()=>report});
+ assert.equal(s.messages.length,2);
+ assert.ok(s.messages.every(part=>part.length<=3800));
+ assert.match(s.messages.at(-1),/\/confirmplan abcdef0123456789$/);
+});
+
 test('only owner private messages may change control state', async () => {
   const s = setup();
   assert.equal(await handleCommand(update(1, '/resume', 7), s), false);

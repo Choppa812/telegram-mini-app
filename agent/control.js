@@ -1,3 +1,5 @@
+import { splitTelegramText } from './portfolio-research.js';
+
 export const STOP_NOTICE = 'Автонастройка и ежедневные сообщения остановлены до /resume. Уже отправленный запрос может завершиться. Автопокупка в Gift Satellite продолжает работать по ранее установленным лимитам.';
 
 function safeFailureCode(error) {
@@ -42,12 +44,12 @@ export async function handleCommand(update, { ownerId, store, send, checkApi, ma
  }else if(command==='/researchdetails'){
  const arg=(m.text||'').trim().split(/\s+/)[1];const page=Number(arg);
  if(!arg||!Number.isInteger(page)||page<0||page>3)await send('Укажите страницу /researchdetails 0–3.');
- else try{await send(await researchDetails(page));}catch{await send('Детали подбора недоступны. Слоты не менялись.');}
+ else try{for(const part of splitTelegramText(await researchDetails(page)))await send(part);}catch{await send('Детали подбора недоступны. Слоты не менялись.');}
  }else if(command==='/applyresearch28'||command==='/confirmplan'){
  if(await store.isPaused())await send('Автонастройка на паузе.');
  else try{const token=command==='/confirmplan'?(m.text||'').trim().split(/\s+/)[1]:undefined; if(command==='/confirmplan'&&!/^[a-f0-9]{16}$/.test(token||''))await send('Используйте команду подтверждения из итогового отчёта: /researchstatus.');else await send(await applyResearch(token));}catch{await send('Применение не запущено: нужен завершённый свежий анализ 28 вариантов либо восстановление доступа. Слоты не менялись.');}
  }else if(command==='/research28'||command==='/researchstatus'||command==='/researchdiverse'||command==='/researchaudit'||command==='/researchfill'||command==='/researchall'||command==='/researchretry'){
- try{await send(command==='/researchstatus'?await researchStatus():await research28(command==='/researchdiverse',command==='/researchaudit',command==='/researchfill',command==='/researchall',command==='/researchretry'));}catch(error){const code=/^(ACCOUNT_READ_FAILED|INVALID_BALANCE|RESEARCH_BUSY|STORE_UNAVAILABLE|STORE_COMMAND_FAILED|SATELLITE_CONFIGURATION_MISSING)$/.test(error.message)?error.message:'RESEARCH_UNAVAILABLE';await send('Подбор портфеля недоступен: '+code+'. Слоты не менялись.');}
+ try{const report=command==='/researchstatus'?await researchStatus():await research28(command==='/researchdiverse',command==='/researchaudit',command==='/researchfill',command==='/researchall',command==='/researchretry');for(const part of splitTelegramText(report))await send(part);}catch(error){const code=/^(ACCOUNT_READ_FAILED|INVALID_BALANCE|RESEARCH_BUSY|STORE_UNAVAILABLE|STORE_COMMAND_FAILED|SATELLITE_CONFIGURATION_MISSING)$/.test(error.message)?error.message:'RESEARCH_UNAVAILABLE';await send('Подбор портфеля недоступен: '+code+'. Слоты не менялись.');}
  }else if(command==='/applyapproved'){
  if(await store.isPaused())await send('Автонастройка на паузе.');
  else try{const row=await applyApproved({beforeWrite:async()=>{if(await store.isPaused())throw new Error('AUTOMATION_PAUSED');}});await send('Trapped Heart / Heartworm / Desert Sand: '+(row.changed?'изменено':row.reason)+'; цена '+(row.price??'—')+' TON. Результат проверен API.');}catch(error){await send('Настройка не завершена: '+safeFailureCode(error));}

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {dailyResearch} from './daily-research.js';
+import {dailyResearch,dailyResearchStatus} from './daily-research.js';
 import {startResearch,processResearchStep,researchText} from './portfolio-research.js';
 
 function fixture(previous=null){
@@ -38,6 +38,22 @@ test('timer never overwrites manual discovery or an applying financial plan',asy
  assert.equal((await startResearch(f.deps)).status,'busy');assert.equal(f.run.id,'manual');
  f.deps.store.getActiveResearchPlan=async()=>({status:'applying'});
  assert.equal((await startResearch(f.deps)).status,'busy');assert.equal(f.queued.length,0);
+});
+test('the next evening replaces abandoned scans instead of resuming stale market data',async()=>{
+ for(const scheduledDay of [undefined,'2026-11-14']){
+  const f=fixture({id:'old',fullCatalog:true,status:'discovering',scheduledDay,startedAt:Date.now()-86400000,discoveryIndex:12});
+  await startResearch(f.deps);
+  assert.notEqual(f.run.id,'old');
+  assert.equal(f.run.scheduledDay,'2026-11-15');
+  assert.equal(f.queued[0].discoveryIndex,0);
+ }
+});
+test('status explains why a scheduled search is waiting',async()=>{
+ const f=fixture();
+ f.deps.store.getDayReport=async()=>null;
+ assert.match(await dailyResearchStatus(f.deps.store),/ждёт успешной штатной проверки/);
+ f.deps.store.isPaused=async()=>true;
+ assert.match(await dailyResearchStatus(f.deps.store),/на паузе/);
 });
 test('scheduled worker makes no API calls or notifications while paused',async()=>{
  const f=fixture({id:'r',scheduledDay:'2026-11-15',status:'discovering'});f.deps.store.isPaused=async()=>true;

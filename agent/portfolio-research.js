@@ -7,6 +7,8 @@ import { scanCatalog } from './catalog-scan.js';
 import {confirmationText,confirmationKeyboard} from './research-confirmation.js';
 
 const identity=r=>JSON.stringify([r.collection,r.model,r.backdrop]);
+const runningResearch = run => ['running','discovering'].includes(run?.status);
+const STALLED_AFTER_MS = 6 * 60 * 60 * 1000;
 export function consistentPrices(history){
  const day=history?.day?.q1,week=history?.week?.q1,median=history?.week?.median;
  return Number.isFinite(day)&&Number.isFinite(week)&&day>0&&week>0&&day>=week*.5&&
@@ -59,8 +61,12 @@ export async function startResearch({store,key,enqueue,send,diversify=false,audi
     if(!previous.notifiedAt){await sendScheduledResearch(previous,store,send);}
     return {status:'completed',duplicate:true};
    }
-   // A running manual scan must not be overwritten by the timer.
-   if(['running','discovering'].includes(previous?.status)&&!previous.scheduledDay)return {status:'busy'};
+   if(runningResearch(previous)){
+    const lastProgress = previous.progressAt ?? previous.revisedAt ?? previous.startedAt;
+    const stalled = Number.isFinite(lastProgress) && Date.now() - lastProgress >= STALLED_AFTER_MS;
+    if(stalled && previous.scheduledDay !== scheduledDay) previous = null;
+    else if(!previous.scheduledDay || !previous.fullCatalog) return {status:'busy'};
+   }
   }
   if(retry){
    if(!previous?.fullCatalog||!['completed','insufficient'].includes(previous.status))return 'Сначала дождитесь завершения полного обхода.';
@@ -198,6 +204,7 @@ export async function processResearchStep(message,{store,key,send,enqueue,varian
      }
      if(['completed','insufficient'].includes(run.status))run.finishedAt=Date.now();
     }else run.status=run.index<run.candidates.length?'running':run.discoveryIndex<result.catalogTotal?'discovering':'insufficient';
+    run.progressAt=Date.now();
     await store.saveResearchRun(run);
     if(!run.scheduledDay&&(run.status==='insufficient'||run.discoveryIndex%10===0))try{await send(researchText(run));}catch{}
     if(run.scheduledDay&&['completed','insufficient'].includes(run.status))await sendScheduledResearch(run,store,send);
@@ -241,6 +248,7 @@ export async function processResearchStep(message,{store,key,send,enqueue,varian
     run.selected.length===28?'completed':run.index===run.candidates.length?(run.discoveryIndex===undefined||run.discoveryIndex<run.discoveryTotal?'discovering':'insufficient'):'running';
    if(['completed','insufficient'].includes(run.status))run.finishedAt=Date.now();
    if(run.status==='discovering'&&run.discoveryIndex===undefined)run.discoveryIndex=0;
+   run.progressAt=Date.now();
    await store.saveResearchRun(run);
    if(!run.scheduledDay&&(run.status!=='running'||run.index%10===0))try{await send(researchText(run));}catch{}
    if(run.scheduledDay&&['completed','insufficient'].includes(run.status))await sendScheduledResearch(run,store,send);
@@ -258,18 +266,23 @@ export async function processResearchStep(message,{store,key,send,enqueue,varian
 }
 async function sendScheduledResearch(run,store,send){
  if(!send||run.notifiedAt||await store.isPaused())return;
- // Telegram rejects messages above 4096 characters. Persist delivery progress
- // so a transient failure on the second part does not repeat the first part.
- const parts=[''];
- for(const line of researchText(run).split('\n')){
-  if(parts.at(-1).length+line.length+1>3800)parts.push('');
-  parts[parts.length-1]+=(parts.at(-1)?'\n':'')+line;
- }
+ const parts=splitTelegramText(researchText(run));
  for(let i=run.reportPartsSent||0;i<parts.length;i++){
   if(await store.isPaused())return;
   await send(parts[i],i===parts.length-1&&run.status==='completed'?{reply_markup:confirmationKeyboard(run)}:{});run.reportPartsSent=i+1;await store.saveResearchRun(run);
  }
  run.notifiedAt=Date.now();await store.saveResearchRun(run);
+}
+export function splitTelegramText(text) {
+ const parts = [];
+ while(text.length > 3800) {
+  const newline = text.lastIndexOf('\n', 3800);
+  const end = newline > 0 ? newline : 3800;
+  parts.push(text.slice(0,end));
+  text = text.slice(newline > 0 ? end + 1 : end);
+ }
+ if(text) parts.push(text);
+ return parts;
 }
 export function researchText(run){
  if(!run)return 'Подбор портфеля ещё не запущен.';
