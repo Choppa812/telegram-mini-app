@@ -2,7 +2,7 @@ import { readSatellite } from './satellite.js';
 import { readBlackModels } from './planning.js';
 import { fetchReadWithRetry } from './read-retry.js';
 import { readVariant } from './variants.js';
-import { readCrossMarket } from './cross.js';
+import { LISTING_MARKETS, readCrossMarket } from './cross.js';
 import { competitivePrice } from './competitive.js';
 
 const BASE = 'https://gift-satellite.dev/api';
@@ -52,7 +52,7 @@ export async function cleanBlackBatch(key, batch, {beforeWrite,fetcher=fetch,pau
 
 async function blackFloor(collection, key, fetcher, pause) {
   const prices=[];
-  for (const market of ['tg','portals','tonnel','mrkt','getgems']) {
+  for (const market of LISTING_MARKETS) {
     const url=new URL(`${BASE}/search/${market}/${encodeURIComponent(collection)}`);
     url.searchParams.set('backdrops','Black');
     const response=await fetchReadWithRetry(url,{method:'GET',headers:{Authorization:`Token ${key}`,Accept:'application/json'},redirect:'error'},fetcher,pause);

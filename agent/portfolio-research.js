@@ -294,6 +294,10 @@ export function researchText(run){
   ...(run.collectionCaps?.['Chill Flame']===3?['Chill Flame: максимум 3 слота; остальные — другие коллекции.']:[]),
   ...(run.discoveryIndex!==undefined&&!run.fullCatalog?[`Дополнительный сбор Black: ${run.discoveryIndex}/${run.discoveryTotal??132} коллекций.`]:[]),
   ...(run.status==='running'?[`Следующий: ${run.candidates[run.index]?.collection} / ${run.candidates[run.index]?.model} / ${run.candidates[run.index]?.backdrop}.`]:[]),
+  ...(['completed','insufficient'].includes(run.status)&&run.rejected?.length
+   ? [`Причины отклонений: ${Object.entries(run.rejected.reduce((counts,{reason})=>{
+     counts[reason]=(counts[reason]||0)+1;return counts;
+    },{})).map(([reason,count])=>`${reason} — ${count}`).join(', ')}.`] : []),
   ...run.selected.map((r,i)=>`${i+1}. ${r.collection} / ${r.model} / ${r.backdrop}: до ${r.ceiling.toFixed(2)} TON; ${r.history.day.count}/${r.history.week.count} продаж.`),
   ...(run.scheduledDay?[`Ежедневный поиск за ${run.scheduledDay}. Новых сочетаний в подборке: ${run.selected.filter(r=>!run.slots.some(s=>s.collectionName===r.collection&&JSON.stringify(s.modelNames)==JSON.stringify([r.model])&&JSON.stringify(s.backdropNames)==JSON.stringify([r.backdrop]))).length}.`,
    'Источники: агрегатор Gift Satellite по пяти площадкам. Новый состав — только после вашего согласования; /researchdetails 0–3 — основания.']:[]),

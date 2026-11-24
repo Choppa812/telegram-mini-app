@@ -15,6 +15,8 @@ test('reads Black listings on five markets without writes or leaking the key', a
   assert.equal(result.ok, true);
   assert.equal(result.writesPerformed, 0);
   assert.equal(seen.length, 5);
+  assert.deepEqual(seen.map(({url}) => url.pathname.split('/')[3]), ['tg','portals','tonnel','mrkt','onchain']);
+  assert.equal(result.rows.at(-1).market, 'onchain');
   for (const { url, options } of seen) {
     assert.equal(options.method, 'GET');
     assert.equal(url.searchParams.get('backdrops'), 'Black');

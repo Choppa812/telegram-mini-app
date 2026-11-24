@@ -1,5 +1,5 @@
 const BASE = 'https://gift-satellite.dev/api';
-const MARKETS = ['tg', 'portals', 'tonnel', 'mrkt', 'getgems'];
+export const LISTING_MARKETS = Object.freeze(['tg', 'portals', 'tonnel', 'mrkt', 'onchain']);
 import { fetchReadWithRetry } from './read-retry.js';
 
 export async function readCrossMarket(collection, key, fetcher = fetch, pause = ms => new Promise(resolve => setTimeout(resolve, ms)), backdrop = 'Black', model = '') {
@@ -7,7 +7,7 @@ export async function readCrossMarket(collection, key, fetcher = fetch, pause = 
   if (typeof backdrop !== 'string' || !/^[^\p{C}\\/]{1,80}$/u.test(backdrop)) throw new Error('INVALID_BACKDROP');
   if (model && (typeof model !== 'string' || !/^[^\p{C}\\/]{1,80}$/u.test(model))) throw new Error('INVALID_MODEL');
   const rows = [];
-  for (const market of MARKETS) {
+  for (const market of LISTING_MARKETS) {
     const url = new URL(`${BASE}/search/${market}/${encodeURIComponent(collection)}`);
     url.searchParams.set('backdrops', backdrop);
     if (model) url.searchParams.set('models', model);
